@@ -1,15 +1,22 @@
 
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
     <title>蓝天系跑团平台</title>
-    <!-- 引入 Three.js 及其 GLTF 加载器 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     
+    <!-- 引入 Three.js 核心库与插件 (基于您的要求使用 ES Module Importmap) -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <style>
         /* ================= 全局变量 & 性能优化材质 ================= */
         :root { --paper-bg: #E8D5B7; --paper-dark: #D4B892; --ink-dark: #2C1E16; --red-btn: #a32a2a; --gold-trim: #5a4b3c; --sys-blue: #4a6da7; }
@@ -48,7 +55,11 @@
         .char-card { background: #fdfaf4; padding: 15px; border-radius: 6px; margin-bottom: 12px; border-left: 4px solid #ccc; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; cursor: pointer; transition: 0.2s; }
         .char-card.active { border-left-color: var(--red-btn); background: #fdf0e6; }
         .active-badge { position: absolute; top: 15px; right: 15px; background: var(--red-btn); color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 4px; display: none;}
-        .char-stats { display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px; color: #666; margin-top: 8px; }
+        .char-card.active .active-badge { display: block; }
+        .char-stats { display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px; color: #666; margin-top: 8px; margin-bottom: 15px;}
+        .char-actions { display: flex; justify-content: flex-end; gap: 10px; border-top: 1px dashed #e0d5c1; padding-top: 8px; }
+        .char-btn { font-size: 12px; color: #888; background: none; border: 1px solid #ccc; padding: 4px 10px; border-radius: 4px; cursor: pointer;}
+        .char-btn:active { background: #eee; }
 
         .profile-card { background: #fdfaf4; padding: 20px; border-radius: 6px; text-align: center; }
         .avatar-display { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid var(--gold-trim); background: #ccc; margin: 0 auto 15px; }
@@ -63,10 +74,6 @@
         .camp-header { display: flex; align-items: center; padding: 12px 15px; background: rgba(255,255,255,0.5); border-bottom: 1px solid #d4c2a7; position: relative; z-index: 10;}
         .header-btn { font-size: 14px; background: #fff; border: 1px solid #ccc; padding: 6px 12px; border-radius: 4px; color: var(--ink-dark); display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; }
         
-        .right-sidebar { width: 56px; background: #fdfaf4; border-left: 1px solid #d4c2a7; display: flex; flex-direction: column; align-items: center; padding-top: 15px; gap: 15px; box-shadow: -2px 0 5px rgba(0,0,0,0.05); }
-        .sidebar-btn { width: 44px; height: 44px; border-radius: 8px; background: #e8dcc8; color: var(--ink-dark); display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; border: 1px solid #c8b79f; transition: 0.15s; }
-        .sidebar-btn:active { transform: scale(0.9); background: #d4b892; }
-
         .chat-area { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; scroll-behavior: auto; }
         .chat-row { display: flex; gap: 10px; align-items: flex-start; width: 100%; }
         .chat-row.player { justify-content: flex-end; } 
@@ -90,6 +97,14 @@
         .player-msg-wrap .chat-bubble { max-width:100%; }
         .chat-input-bar:focus-within { box-shadow:0 -4px 14px rgba(90,75,60,.12); }
 
+        /* 侧边栏及折叠交互 */
+        .right-sidebar-wrap { display: flex; position: relative; z-index: 10; height: 100%; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .right-sidebar-wrap.collapsed { transform: translateX(100%); }
+        .right-sidebar { width: 56px; background: #fdfaf4; border-left: 1px solid #d4c2a7; display: flex; flex-direction: column; align-items: center; padding-top: 15px; gap: 15px; box-shadow: -2px 0 5px rgba(0,0,0,0.05); height: 100%;}
+        .sidebar-btn { width: 44px; height: 44px; border-radius: 8px; background: #e8dcc8; color: var(--ink-dark); display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; border: 1px solid #c8b79f; transition: 0.15s; }
+        .sidebar-btn:active { transform: scale(0.9); background: #d4b892; }
+        .sidebar-toggle { position: absolute; left: -22px; top: 50%; transform: translateY(-50%); width: 22px; height: 60px; background: #fdfaf4; border: 1px solid #d4c2a7; border-right: none; border-radius: 8px 0 0 8px; box-shadow: -2px 0 4px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; color: #888;}
+
         /* ================= 4. 抽屉与模态框 ================= */
         .drawer { position: absolute; top: 0; bottom: 0; width: 75%; max-width: 320px; background: #fdfaf4; z-index: 100; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.2); transition: transform 0.3s; will-change: transform; overflow-y:auto; }
         .drawer-left { left: 0; transform: translate3d(-105%, 0, 0); border-right: 2px solid var(--gold-trim);}
@@ -107,7 +122,7 @@
         .form-row { display: flex; gap: 8px; align-items: flex-end;}
 
         /* 高级建卡属性框 */
-        .attr-row-box { background: #f4ebd8; padding: 10px; border-radius: 6px; border: 1px solid #d4c2a7; margin-bottom: 10px;}
+        .attr-row-box { background: #f4ebd8; padding: 10px; border-radius: 6px; border: 1px solid #d4c2a7; margin-bottom: 10px; position:relative;}
 
         /* 手绘骰子面板样式 */
         .handdrawn-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 15px; }
@@ -126,7 +141,7 @@
         .manual-dice-box { background:#f7efe2; border:1px solid #d9c5a6; border-radius:8px; padding:12px; margin-bottom:22px; }
         .dice-hint { color:#8a7156; font-size:12px; line-height:1.5; margin-top:8px; }
         
-        /* ============== 古典装裱风格属性面板 ============== */
+        /* 古典装裱风格属性面板 */
         .stat-block { margin-bottom:17px; padding:12px 14px; border:1px solid #d4c2a7; border-radius:4px; background:linear-gradient(135deg, #fdfaf4 0%, #f4ebd8 100%); box-shadow:inset 0 0 0 1px #fff, 0 2px 4px rgba(44,30,22,0.06); position:relative; }
         .stat-block::before, .stat-block::after { content:''; position:absolute; width:12px; height:12px; border:2px solid #bda88a; pointer-events:none; }
         .stat-block::before { top:-1px; left:-1px; border-right:none; border-bottom:none; }
@@ -143,7 +158,6 @@
         .float-bubble.active-float { animation:float-up-fade 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
         @keyframes float-up-fade { 0% { transform:translate(0, 5px) scale(0.6); opacity:0; } 15% { transform:translate(5px, -8px) scale(1.1); opacity:1; } 100% { transform:translate(10px, -24px) scale(0.9); opacity:0; } }
 
-        /* 装裱条 (无走马灯动画) */
         .bar-container { position:relative; height:20px; background:#231b14; border-radius:3px; box-shadow:inset 0 2px 5px rgba(0,0,0,0.8); margin-top:10px; border:1px solid #4a3b2c; }
         .bar-container::before, .bar-container::after { content:''; position:absolute; top:-3px; bottom:-3px; width:6px; background:linear-gradient(180deg, #e0cca8, #a88d6c, #5a4b3c); border:1px solid #2c1e16; border-radius:2px; z-index:5; box-shadow:0 1px 3px rgba(0,0,0,0.4); }
         .bar-container::before { left:-4px; }
@@ -152,13 +166,14 @@
         .bar-fill::after { content:''; position:absolute; top:0; left:0; right:0; height:45%; background:linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.05) 100%); border-radius:2px 2px 0 0; }
         .bar-value-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:800; text-shadow:0 1px 2px #000, 0 0 4px rgba(0,0,0,0.8); z-index:3; pointer-events:none; letter-spacing:0.5px; }
 
-        /* 纯3D与备用2D骰子展示层 */
-        #three-canvas-container { position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; z-index:9999; display:none; }
+        /* ======== 3D 与备用 2D 骰子画布层 ======== */
+        #three-canvas-container { position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; z-index:9999; display:none; background:rgba(0,0,0,0.3); }
+        #three-canvas { width: 100%; height: 100%; }
         #three-labels { position:absolute; top:0; left:0; width:100%; height:100%; overflow:hidden; pointer-events:none; }
+        
         .dice-stage { position:fixed; inset:0; z-index:180; pointer-events:none; display:flex; align-items:center; justify-content:center; perspective:1050px; opacity:0; transition:opacity .12s linear; background:radial-gradient(circle at 50% 52%, rgba(0,0,0,.12), rgba(0,0,0,0) 42%); contain:layout paint style; }
         .dice-stage.active { opacity:1; }
         .dice-cloud { display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content:center; max-width:92vw; transform-style:preserve-3d; contain:layout paint style; }
-        
         .true-d20 { --dice-size:138px; --tri-w:92px; --tri-h:80px; --dice-z:46px; width:var(--dice-size); height:var(--dice-size); position:relative; transform-style:preserve-3d; animation:true-d20-slam .92s cubic-bezier(.16,.82,.18,1.04) forwards; will-change:transform,opacity; contain:layout paint style; }
         .true-d20.small { --dice-size:70px; --tri-w:46px; --tri-h:40px; --dice-z:23px; animation-duration:.76s; }
         .d20-core { position:absolute; inset:0; transform-style:preserve-3d; animation:true-d20-spin .78s cubic-bezier(.2,.7,.18,1) forwards; will-change:transform; }
@@ -194,8 +209,7 @@
         #avatar-upload { display: none; }
         .avatar-edit-label { display: inline-block; padding: 5px 10px; background: #eee; border-radius: 4px; font-size: 12px; cursor: pointer; margin-bottom: 10px; border: 1px solid #ccc;}
     </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="/Static/css/Global.css"/><link rel="stylesheet" href="/Web/css/Global.css"/><link rel="stylesheet" href="/Web/css/SoruxGPT.css"/></head>
+</head>
 <body>
 
     <!-- 3D 渲染画布层 -->
@@ -205,6 +219,144 @@
     </div>
     <!-- 备用 2D 渲染画布层 -->
     <div id="dice-stage" class="dice-stage" aria-hidden="true"></div>
+
+    <!-- ES Module: Three.js 核心逻辑封装 -->
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        let scene, camera, renderer, diceGLTF;
+        window.is3DReady = false;
+
+        // 初始化 3D 场景
+        function init3D() {
+            const canvas = document.getElementById('three-canvas');
+            renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+
+            scene = new THREE.Scene();
+
+            const aspect = window.innerWidth / window.innerHeight;
+            // 采用正交或透视均可，这里按您提供的参考稍作修改适应屏幕
+            camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 100);
+            camera.position.set(0, 15, 0); 
+            camera.lookAt(0, 0, 0);
+            
+            // 灯光布置
+            scene.add(new THREE.AmbientLight(0x404066, 2.5));
+            const keyLight = new THREE.DirectionalLight(0xffffff, 4);
+            keyLight.position.set(5, 8, 5); keyLight.castShadow = true; scene.add(keyLight);
+            const fillLight1 = new THREE.DirectionalLight(0xcc88ff, 1.5); fillLight1.position.set(-3, 1, -4); scene.add(fillLight1);
+            const fillLight2 = new THREE.DirectionalLight(0x88ccff, 2); fillLight2.position.set(0, -2, 0); scene.add(fillLight2);
+
+            // 加载模型 20d.glb
+            new GLTFLoader().load('./20d.glb', (gltf) => {
+                const model = gltf.scene;
+                const box = new THREE.Box3().setFromObject(model);
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+                if (maxDim > 3) { const scale = 3 / maxDim; model.scale.set(scale, scale, scale); }
+                
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true; child.receiveShadow = true;
+                        if (child.material) { child.material.roughness = 0.3; child.material.metalness = 0.1; }
+                    }
+                });
+                diceGLTF = model;
+                window.is3DReady = true;
+                console.log("3D Dice model loaded successfully.");
+            }, undefined, (e) => console.log('3D model load error, will fallback to 2D CSS'));
+            
+            window.addEventListener('resize', () => {
+                if(camera && renderer) {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
+                }
+            });
+        }
+
+        // 绑定到全局供外部调用
+        window.trigger3DDiceRoll = function(results, diceCount) {
+            const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const maxAnimated = ((navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || window.innerWidth < 380) ? 3 : 5;
+            
+            // 如果 3D 没加载好或者需要降级，调用传统的 2D 方法
+            if(!window.is3DReady || reduceMotion || diceCount > maxAnimated) {
+                if(window.play2DDiceAnimationFallback) window.play2DDiceAnimationFallback(results, diceCount);
+                return;
+            }
+
+            const container = document.getElementById('three-canvas-container');
+            container.style.display = 'block';
+            
+            // 清理旧的骰子
+            scene.children = scene.children.filter(c => c.isLight || c.isCamera); 
+
+            let activeDice = [];
+            for(let i=0; i<Math.min(diceCount, maxAnimated); i++) {
+                let mesh = diceGLTF.clone();
+                // 随机初始位置和高度
+                mesh.position.set((Math.random()-0.5)*10, 10 + Math.random()*5, (Math.random()-0.5)*10);
+                scene.add(mesh);
+                activeDice.push({ 
+                    mesh, 
+                    vx: (Math.random()-0.5)*0.3, 
+                    vy: -0.2 - Math.random()*0.3, 
+                    vz: (Math.random()-0.5)*0.3, 
+                    rx: Math.random()*0.5, ry: Math.random()*0.5, rz: Math.random()*0.5, 
+                    result: results[i] 
+                });
+            }
+            
+            let frames = 0;
+            let animationId;
+            function animate() {
+                if(frames > 80) { // 约 1.3 秒后停止翻滚并展示悬浮字
+                    cancelAnimationFrame(animationId);
+                    const labelsContainer = document.getElementById('three-labels'); labelsContainer.innerHTML = '';
+                    activeDice.forEach(d => {
+                        const vector = d.mesh.position.clone(); vector.project(camera);
+                        const x = (vector.x * .5 + .5) * window.innerWidth; const y = (vector.y * -.5 + .5) * window.innerHeight;
+                        const label = document.createElement('div'); label.innerText = d.result;
+                        label.style.cssText = `position:absolute; left:${x}px; top:${y}px; transform:translate(-50%,-50%); color:#fff; font-size:42px; font-weight:900; text-shadow:0 3px 6px rgba(0,0,0,0.9), 0 0 15px rgba(255,255,255,0.6); z-index:100; font-family:serif;`;
+                        labelsContainer.appendChild(label);
+                    });
+                    setTimeout(() => { container.style.display = 'none'; labelsContainer.innerHTML = ''; }, 1500);
+                    return;
+                }
+                animationId = requestAnimationFrame(animate); frames++;
+                
+                // 模拟简单的重力与碰撞
+                activeDice.forEach(d => {
+                    if(d.mesh.position.y > 0) {
+                        d.vy -= 0.02; // 重力
+                        d.mesh.position.y += d.vy; d.mesh.position.x += d.vx; d.mesh.position.z += d.vz;
+                        d.mesh.rotation.x += d.rx; d.mesh.rotation.y += d.ry; d.mesh.rotation.z += d.rz;
+                    } else {
+                        // 触底反弹
+                        if(d.vy < -0.05) { 
+                            d.vy *= -0.6; // 反弹损耗
+                            d.mesh.position.y = 0.1; 
+                            d.rx *= 0.6; d.ry *= 0.6; d.rz *= 0.6; 
+                        } else {
+                            d.mesh.position.y = 0;
+                            d.rx *= 0.8; d.ry *= 0.8; d.rz *= 0.8; 
+                        }
+                    }
+                });
+                renderer.render(scene, camera);
+            }
+            animate();
+        };
+
+        // 启动 3D 引擎
+        init3D();
+    </script>
 
     <!-- ================= 1. 登录大厅 ================= -->
     <div id="view-login" class="view active">
@@ -262,7 +414,7 @@
             <div id="in-camp-title" style="font-weight: bold; font-size:16px; flex:1; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:15px;">房间</div>
         </div>
 
-        <div style="display:flex; flex:1; overflow:hidden;">
+        <div style="display:flex; flex:1; overflow:hidden; position:relative;">
             <!-- 左侧：聊天区与输入区 -->
             <div style="flex:1; display:flex; flex-direction:column; position:relative;">
                 <div class="chat-area" id="chat-box"></div>
@@ -276,23 +428,26 @@
                 </div>
             </div>
             
-            <!-- 右侧：统一多功能面板导航侧栏 -->
-            <div class="right-sidebar">
-                <div class="sidebar-btn" onclick="openMultiDrawer('info')">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                    <span style="font-size:10px; margin-top:2px;">信息</span>
-                </div>
-                <div class="sidebar-btn" onclick="openMultiDrawer('stats')">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                    <span style="font-size:10px; margin-top:2px;">属性</span>
-                </div>
-                <div class="sidebar-btn" onclick="openMultiDrawer('inventory')">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
-                    <span style="font-size:10px; margin-top:2px;">背包</span>
-                </div>
-                <div class="sidebar-btn" onclick="openMultiDrawer('dice')">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><circle cx="15.5" cy="15.5" r="1.5"></circle><circle cx="15.5" cy="8.5" r="1.5"></circle><circle cx="8.5" cy="15.5" r="1.5"></circle></svg>
-                    <span style="font-size:10px; margin-top:2px;">掷骰</span>
+            <!-- 右侧：带有折叠功能的侧栏 -->
+            <div class="right-sidebar-wrap collapsed" id="right-sidebar-wrap">
+                <div class="sidebar-toggle" onclick="toggleSidebar()">◀</div>
+                <div class="right-sidebar">
+                    <div class="sidebar-btn" onclick="openMultiDrawer('info')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        <span style="font-size:10px; margin-top:2px;">信息</span>
+                    </div>
+                    <div class="sidebar-btn" onclick="openMultiDrawer('stats')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                        <span style="font-size:10px; margin-top:2px;">属性</span>
+                    </div>
+                    <div class="sidebar-btn" onclick="openMultiDrawer('inventory')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                        <span style="font-size:10px; margin-top:2px;">背包</span>
+                    </div>
+                    <div class="sidebar-btn" onclick="openMultiDrawer('dice')">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><circle cx="15.5" cy="15.5" r="1.5"></circle><circle cx="15.5" cy="8.5" r="1.5"></circle><circle cx="8.5" cy="15.5" r="1.5"></circle></svg>
+                        <span style="font-size:10px; margin-top:2px;">掷骰</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -363,9 +518,9 @@
         <div class="form-row"><button class="primary-btn secondary-btn" style="flex:1;" onclick="closeAll()">取消</button><button class="primary-btn" style="flex:1;" onclick="saveProfile()">保存</button></div>
     </div>
 
-    <!-- 创建角色名片 -->
+    <!-- 创建/编辑角色名片 -->
     <div id="modal-create-char" class="modal">
-        <h3 style="margin-bottom: 15px; text-align:center;">建立角色档案</h3>
+        <h3 id="char-modal-title" style="margin-bottom: 15px; text-align:center;">建立角色档案</h3>
         <div style="text-align:center; margin-bottom:15px;">
             <img id="new-char-avatar-img" src="" style="width:60px; height:60px; border-radius:50%; object-fit:cover; border:2px solid var(--gold-trim); margin-bottom:5px;">
             <br>
@@ -379,16 +534,18 @@
         <label style="display:block; font-size:13px; color:#666; margin:15px 0 5px;">自定义属性区 (生命、理智等)</label>
         <div id="dynamic-attrs-container"></div>
         <button class="secondary-btn" style="width:100%; margin-bottom:15px; padding:8px; font-size:13px; border-radius:4px; border:1px dashed #aaa;" onclick="addDynamicAttr()">+ 增加一条新属性</button>
-        <div class="form-row"><button class="primary-btn secondary-btn" style="flex:1;" onclick="closeAll()">取消</button><button class="primary-btn" style="flex:1;" onclick="saveCharacter()">建立档案</button></div>
+        <div class="form-row"><button class="primary-btn secondary-btn" style="flex:1;" onclick="closeAll()">取消</button><button class="primary-btn" style="flex:1;" onclick="saveCharacter()">保存档案</button></div>
     </div>
 
+    <!-- 主逻辑脚本 -->
     <script>
         // ================= 数据架构与缓存 =================
-        const STORAGE_KEY = 'trpg_sheep_data_v5';
-        const PROFILE_CACHE_KEY = 'trpg_profiles_cache_v2';
+        const STORAGE_KEY = 'trpg_sheep_data_v6';
+        const PROFILE_CACHE_KEY = 'trpg_profiles_cache_v3';
+        const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23999'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
         
         let appData = {
-            profile: { nickname: "流浪调查员", signature: "愿骰子之神保佑...", avatar: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23999'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" },
+            profile: { nickname: "流浪调查员", signature: "愿骰子之神保佑...", avatar: DEFAULT_AVATAR },
             campaigns:[], characters:[], activeCharId: null
         };
 
@@ -404,7 +561,16 @@
         function navigateTo(viewId) { document.querySelectorAll('.view').forEach(el => el.classList.remove('active')); document.getElementById(viewId).classList.add('active'); }
         function switchTab(tabId) { document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active')); document.getElementById(tabId).classList.add('active'); document.querySelector(`.nav-item[data-target="${tabId}"]`).classList.add('active'); }
         function openModal(modalId) { document.getElementById(modalId).classList.add('active'); document.getElementById('overlay').classList.add('active'); }
-        function closeAll() { const leftWasOpen = document.getElementById('drawer-left')?.classList.contains('open'); stopHoldStat(); document.querySelectorAll('.drawer').forEach(el => el.classList.remove('open')); document.querySelectorAll('.modal').forEach(el => el.classList.remove('active')); document.getElementById('overlay').classList.remove('active'); if(leftWasOpen) reportStatChanges(); }
+        function closeAll() { const leftWasOpen = document.getElementById('drawer-left')?.classList.contains('open'); stopHoldStat(); document.querySelectorAll('.drawer').forEach(el => el.classList.remove('open')); document.querySelectorAll('.modal').forEach(el => el.classList.remove('active')); document.getElementById('overlay').classList.remove('active'); if(leftWasOpen) reportStatChanges(); editingCharId = null;}
+        function toggleSidebar() {
+            const wrap = document.getElementById('right-sidebar-wrap');
+            const toggleBtn = document.querySelector('.sidebar-toggle');
+            if (wrap.classList.contains('collapsed')) {
+                wrap.classList.remove('collapsed'); toggleBtn.innerText = '▶';
+            } else {
+                wrap.classList.add('collapsed'); toggleBtn.innerText = '◀';
+            }
+        }
 
         // 统一多功能面板抽屉
         async function openMultiDrawer(type) {
@@ -420,11 +586,10 @@
                 title.innerText = '背包物品';
                 const char = getActiveChar();
                 if(!char) content.innerHTML = `<div style="color:#888; text-align:center; margin-top:20px;">当前未扮演任何角色</div>`;
-                else content.innerHTML = `<textarea class="form-input" style="height:50vh; resize:none; font-family:inherit; background:#fffaf3; font-size:14px; line-height:1.5;" oninput="updateInventory(this.value)" placeholder="在这里记录随身物品、线索、金币...">${escapeHtml(char.inventory || '')}</textarea>`;
+                else content.innerHTML = `<textarea class="form-input" style="height:50vh; resize:none; font-family:inherit; background:#fffaf3; font-size:14px; line-height:1.5; border:1px solid #d4c2a7;" oninput="updateInventory(this.value)" placeholder="在这里记录随身物品、线索、金币...">${escapeHtml(char.inventory || '')}</textarea>`;
             } else if (type === 'dice') {
                 title.innerText = '掷骰面板';
                 content.innerHTML = document.getElementById('template-dice-panel').innerHTML;
-                // Bind enter key
                 const manualInput = document.getElementById('manual-dice-input');
                 if(manualInput) manualInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') { e.preventDefault(); rollManualFromDrawer(); } });
             } else if (type === 'info') {
@@ -433,10 +598,11 @@
                 await populateInfoDrawer(content);
             }
             
-            captureStatSnapshot(); document.getElementById('drawer-left').classList.add('open'); document.getElementById('overlay').classList.add('active');
+            if(type==='stats') captureStatSnapshot(); 
+            document.getElementById('drawer-left').classList.add('open'); document.getElementById('overlay').classList.add('active');
         }
 
-        // ================= 角色与背包云端同步 =================
+        // ================= 角色档案与修改删除 =================
         function getActiveChar() { return appData.characters.find(c => c.id === appData.activeCharId) || null; }
         
         function renderCharacterList() {
@@ -453,12 +619,16 @@
                         <div><div style="font-weight:bold; font-size:15px;">${escapeHtml(char.name)}</div><div style="font-size:12px; color:#666;">${escapeHtml(char.role)}</div></div>
                     </div>
                     <div class="char-stats">${statsHtml}</div>
+                    <div class="char-actions">
+                        <button class="char-btn" onclick="editCharacter(event, '${char.id}')">编辑</button>
+                        <button class="char-btn" style="color:var(--red-btn); border-color:#e0b4b4;" onclick="deleteCharacter(event, '${char.id}')">删除</button>
+                    </div>
                 </div>`;
             }).join('');
         }
 
         async function selectActiveChar(charId) { 
-            // 若点击当前扮演中的角色，则卸下该角色（免装备状态）
+            // 免装备机制：点选已扮演的，则卸下
             if (appData.activeCharId === charId) { appData.activeCharId = null; appData.characters.forEach(c => c.is_active = false); }
             else { appData.activeCharId = charId; appData.characters.forEach(c => c.is_active = (c.id === charId)); }
             renderCharacterList(); saveToLocal(); 
@@ -467,6 +637,30 @@
                 await api(`characters?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ is_active: false }) });
                 if(appData.activeCharId) await api(`characters?id=eq.${charId}`, { method: 'PATCH', body: JSON.stringify({ is_active: true }) });
             } catch(e) {}
+        }
+
+        async function deleteCharacter(e, charId) {
+            e.stopPropagation();
+            if(!confirm("确定要删除这份角色档案吗？此操作无法恢复。")) return;
+            appData.characters = appData.characters.filter(c => c.id !== charId);
+            if(appData.activeCharId === charId) appData.activeCharId = null;
+            renderCharacterList(); saveToLocal();
+            try { await api(`characters?id=eq.${charId}`, { method: 'DELETE' }); } catch(e) { console.error("Del fail", e); }
+        }
+
+        let editingCharId = null;
+        function editCharacter(e, charId) {
+            e.stopPropagation();
+            const char = appData.characters.find(c => c.id === charId); if(!char) return;
+            editingCharId = charId;
+            document.getElementById('char-modal-title').innerText = "修改角色档案";
+            tempNewCharAvatar = char.avatar_url || DEFAULT_AVATAR;
+            document.getElementById('new-char-avatar-img').src = tempNewCharAvatar;
+            document.getElementById('char-name').value = char.name;
+            document.getElementById('char-class').value = char.role;
+            const container = document.getElementById('dynamic-attrs-container'); container.innerHTML = '';
+            (char.stats || []).forEach(s => { container.insertAdjacentHTML('beforeend', getAttrRowHtml(s.key, s.val, s.max, s.isBar, s.color)); });
+            openModal('modal-create-char');
         }
 
         async function loadCharactersFromSupabase() {
@@ -502,26 +696,30 @@
             const char = getActiveChar(); if(!char) return;
             char.inventory = val; saveToLocal();
             if(inventoryTimer) clearTimeout(inventoryTimer);
-            inventoryTimer = setTimeout(async () => {
-                try { await api(`characters?id=eq.${char.id}`, { method: 'PATCH', body: JSON.stringify({ inventory: val, updated_at: new Date().toISOString() }) }); } catch(e) {}
-            }, 1500);
+            inventoryTimer = setTimeout(async () => { try { await api(`characters?id=eq.${char.id}`, { method: 'PATCH', body: JSON.stringify({ inventory: val, updated_at: new Date().toISOString() }) }); } catch(e) {} }, 1500);
         }
 
         let tempNewCharAvatar = '';
         async function handleNewCharAvatarUpload(event) {
             const file = event.target.files && event.target.files[0]; if(!file) return;
             try {
-                setAuthStatus('上传中...'); const url = await uploadToImgBB(file);
-                tempNewCharAvatar = url; document.getElementById('new-char-avatar-img').src = url; setAuthStatus('');
+                const url = await uploadToImgBB(file);
+                tempNewCharAvatar = url; document.getElementById('new-char-avatar-img').src = url; 
             } catch (err) { alert(`上传失败：${err.message}`); } finally { event.target.value = ''; }
         }
 
         function getAttrRowHtml(key='', val='', max='', isBar=false, color='#a32a2a') {
-            return `<div class="attr-row-box"><div style="display:flex; gap:5px; margin-bottom:8px;"><input class="a-key form-input" placeholder="属性名" value="${key}" style="flex:2;"><input class="a-val form-input" type="number" placeholder="当前" value="${val}" style="flex:1;"><input class="a-max form-input" type="number" placeholder="上限" value="${max}" style="flex:1;"></div><div style="display:flex; gap:10px; align-items:center; font-size:12px; font-weight:bold;"><label><input type="checkbox" class="a-isbar" ${isBar?'checked':''} style="transform:scale(1.2); margin-right:5px;">以条状显示</label><input type="color" class="a-color" value="${color}" style="height:24px; border:none; background:none;"></div></div>`;
+            // 给行加个红色的删除微标，避免属性乱了删不掉
+            return `<div class="attr-row-box">
+                <button style="position:absolute; right:-5px; top:-5px; background:var(--red-btn); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:12px; cursor:pointer;" onclick="this.parentElement.remove()">✕</button>
+                <div style="display:flex; gap:5px; margin-bottom:8px;"><input class="a-key form-input" placeholder="属性名" value="${key}" style="flex:2;"><input class="a-val form-input" type="number" placeholder="当前" value="${val}" style="flex:1;"><input class="a-max form-input" type="number" placeholder="上限" value="${max}" style="flex:1;"></div><div style="display:flex; gap:10px; align-items:center; font-size:12px; font-weight:bold;"><label><input type="checkbox" class="a-isbar" ${isBar?'checked':''} style="transform:scale(1.2); margin-right:5px;">以条状显示</label><input type="color" class="a-color" value="${color}" style="height:24px; border:none; background:none;"></div></div>`;
         }
         function initCreateCharModal() { 
-            tempNewCharAvatar = ''; document.getElementById('new-char-avatar-img').src = DEFAULT_AVATAR;
+            editingCharId = null;
+            document.getElementById('char-modal-title').innerText = "建立角色档案";
+            tempNewCharAvatar = DEFAULT_AVATAR; document.getElementById('new-char-avatar-img').src = DEFAULT_AVATAR;
             document.getElementById('dynamic-attrs-container').innerHTML = getAttrRowHtml('生命', 10, 10, true, '#a32a2a') + getAttrRowHtml('理智', 50, 99, true, '#4a6da7') + getAttrRowHtml('力量', 50, '', false, '#000000'); 
+            document.getElementById('char-name').value=''; document.getElementById('char-class').value='';
         }
         function addDynamicAttr() { document.getElementById('dynamic-attrs-container').insertAdjacentHTML('beforeend', getAttrRowHtml()); }
         
@@ -531,11 +729,17 @@
                 const key = row.querySelector('.a-key').value.trim();
                 if(key) stats.push({ key, val: parseInt(row.querySelector('.a-val').value)||0, max: parseInt(row.querySelector('.a-max').value)||0, isBar: row.querySelector('.a-isbar').checked, color: row.querySelector('.a-color').value });
             });
-            const newChar = { id: "char_" + Date.now(), name, role, stats, inventory: "", avatar_url: tempNewCharAvatar };
-            appData.characters.unshift(newChar);
-            if(!appData.activeCharId) appData.activeCharId = newChar.id;
-            renderCharacterList(); saveToLocal(); await syncCharToBackend(newChar, newChar.id === appData.activeCharId);
-            closeAll(); document.getElementById('char-name').value=''; document.getElementById('char-class').value=''; initCreateCharModal();
+            
+            if(editingCharId) {
+                const char = appData.characters.find(c => c.id === editingCharId);
+                if(char) { char.name = name; char.role = role; char.stats = stats; char.avatar_url = tempNewCharAvatar; await syncCharToBackend(char, char.id === appData.activeCharId); }
+            } else {
+                const newChar = { id: "char_" + Date.now(), name, role, stats, inventory: "", avatar_url: tempNewCharAvatar };
+                appData.characters.unshift(newChar);
+                if(!appData.activeCharId) appData.activeCharId = newChar.id;
+                await syncCharToBackend(newChar, newChar.id === appData.activeCharId);
+            }
+            renderCharacterList(); saveToLocal(); closeAll(); initCreateCharModal();
         }
 
         // ================= 跑团内部：属性通报与可操作面板 =================
@@ -663,12 +867,12 @@
                     document.getElementById('vu-char-stats').innerHTML = statsHtml || '<div style="color:#888; font-size:13px;">该角色暂无属性记录。</div>';
                 } else {
                     document.getElementById('vu-char-header').innerText = '未扮演任何角色';
-                    document.getElementById('vu-char-stats').innerHTML = '<div style="color:#888; font-size:13px;">该玩家当前以观察者身份旁观。</div>';
+                    document.getElementById('vu-char-stats').innerHTML = '<div style="color:#888; font-size:13px;">该玩家当前以旁观者身份游玩。</div>';
                 }
             } catch(e) { document.getElementById('vu-char-header').innerText = '查询失败'; document.getElementById('vu-char-stats').innerHTML = `<div style="color:#a32a2a; font-size:13px;">网络波动或角色表未就绪。</div>`; }
         }
 
-        // ================= 掷骰与真正的 3D 动画 =================
+        // ================= 掷骰与降级 2D 动画 =================
         function rollManualFromDrawer() { const cmd = document.getElementById('manual-dice-input').value.trim(); if(cmd){ document.getElementById('msg-input').value = cmd.startsWith('.') ? cmd : '.' + cmd; sendMsg(); closeAll(); } }
         function rollQuick(face) { document.getElementById('msg-input').value = `.1d${face}`; sendMsg(); closeAll(); }
 
@@ -699,99 +903,23 @@
             const dName = charName || appData.profile.nickname;
             const animationTip = roll.diceCount > 5 ? '<div style="font-size:12px; color:#888; margin-top:4px;">(骰子较多已省略重动画)</div>' : '';
             const html = `<div style="font-size:12px; color:#888; margin-bottom:4px;">系统裁决</div><span class="mention">@${escapeHtml(dName)}</span> 执行掷骰 <b>.${escapeHtml(roll.expr)}</b><br><span style="color:#666; font-size:13px;">${escapeHtml(details.join(' '))}</span><br>最终结果：<span style="color:var(--red-btn); font-size:22px; font-weight:900;">${total}</span>${animationTip}`;
-            postSysMessage(html); play3DDiceAnimation(results, roll.diceCount);
+            postSysMessage(html); 
+            
+            // 调用通过 module 绑定的真实 3D 动画（内部自带降级机制）
+            if(window.trigger3DDiceRoll) window.trigger3DDiceRoll(results, roll.diceCount);
+            else play2DDiceAnimationFallback(results, roll.diceCount);
         }
 
-        // --- 真正的 3D 渲染逻辑 ---
-        let scene3d, camera3d, renderer3d, diceGLTF;
-        let is3DReady = false;
-        function init3D() {
-            if(!window.THREE) return;
-            const canvas = document.getElementById('three-canvas');
-            renderer3d = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-            renderer3d.setSize(window.innerWidth, window.innerHeight);
-            scene3d = new THREE.Scene();
-            const aspect = window.innerWidth / window.innerHeight;
-            camera3d = new THREE.OrthographicCamera(-10 * aspect, 10 * aspect, 10, -10, 0.1, 100);
-            camera3d.position.set(0, 10, 0); camera3d.lookAt(0, 0, 0);
-            
-            const light = new THREE.DirectionalLight(0xffffff, 1.2); light.position.set(5, 20, 10); scene3d.add(light);
-            scene3d.add(new THREE.AmbientLight(0xffffff, 0.8));
-
-            new THREE.GLTFLoader().load('./20d.glb', (gltf) => {
-                diceGLTF = gltf.scene;
-                const box = new THREE.Box3().setFromObject(diceGLTF);
-                const size = box.getSize(new THREE.Vector3()).length();
-                const scale = 4 / size; // 适配显示大小
-                diceGLTF.scale.set(scale, scale, scale);
-                is3DReady = true;
-            }, undefined, (e) => console.log('3D model load error, fallback to 2D CSS'));
-            
-            window.addEventListener('resize', () => {
-                if(camera3d && renderer3d) {
-                    const asc = window.innerWidth / window.innerHeight;
-                    camera3d.left = -10 * asc; camera3d.right = 10 * asc;
-                    camera3d.updateProjectionMatrix(); renderer3d.setSize(window.innerWidth, window.innerHeight);
-                }
-            });
-        }
-
-        function play3DDiceAnimation(results, diceCount) {
-            const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            const maxAnimated = ((navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || window.innerWidth < 380) ? 3 : 5;
-            
-            // 回退到备用的 CSS 2D 效果
-            if(!is3DReady || reduceMotion || diceCount > maxAnimated) {
-                const stage = document.getElementById('dice-stage');
-                if(reduceMotion || diceCount > maxAnimated) {
-                    stage.innerHTML = `<div class="dice-skip-toast">${diceCount} 枚骰子已快速结算，省略重动画</div>`; stage.classList.add('active');
-                    setTimeout(() => stage.classList.remove('active'), 760); setTimeout(() => { if(!stage.classList.contains('active')) stage.innerHTML = ''; }, 980); return;
-                }
-                const diceHtml = results.slice(0, maxAnimated).map((r, idx) => `<div class="true-d20 ${diceCount>1?'small':''}" style="animation-delay:${Math.min(idx*70,260)}ms"><div class="d20-core">${Array.from({length:20},()=>'<span class="ico-face"></span>').join('')}<div class="d20-number">${r}</div></div><div class="dice-impact-ring"></div></div>`).join('');
-                stage.innerHTML = `<div class="dice-cloud">${diceHtml}</div>`; stage.classList.add('active');
-                setTimeout(() => stage.classList.remove('active'), 1080); setTimeout(() => { if(!stage.classList.contains('active')) stage.innerHTML = ''; }, 1280);
-                return;
+        // 备用的纯 CSS 2D 动画 (万一浏览器不支持 Three.js)
+        window.play2DDiceAnimationFallback = function(results, diceCount) {
+            const stage = document.getElementById('dice-stage'); const maxAnimated = 3;
+            if(diceCount > maxAnimated) {
+                stage.innerHTML = `<div class="dice-skip-toast">${diceCount} 枚骰子已快速结算</div>`; stage.classList.add('active');
+                setTimeout(() => stage.classList.remove('active'), 760); setTimeout(() => { if(!stage.classList.contains('active')) stage.innerHTML = ''; }, 980); return;
             }
-
-            // 真正的 3D 渲染执行
-            const container = document.getElementById('three-canvas-container');
-            container.style.display = 'block';
-            scene3d.children = scene3d.children.filter(c => c.isLight); // 清理旧骰子
-            
-            let activeDice = [];
-            for(let i=0; i<Math.min(diceCount, maxAnimated); i++) {
-                let mesh = diceGLTF.clone();
-                mesh.position.set((Math.random()-0.5)*8, 10 + Math.random()*5, (Math.random()-0.5)*8);
-                scene3d.add(mesh);
-                activeDice.push({ mesh, vx:(Math.random()-0.5)*0.2, vy: -0.2 - Math.random()*0.2, vz:(Math.random()-0.5)*0.2, rx:Math.random()*0.4, ry:Math.random()*0.4, rz:Math.random()*0.4, result: results[i] });
-            }
-            
-            let frames = 0;
-            function animate() {
-                if(frames > 90) { // 大约 1.5 秒后停止翻滚并展示悬浮字
-                    const labelsContainer = document.getElementById('three-labels'); labelsContainer.innerHTML = '';
-                    activeDice.forEach(d => {
-                        const vector = d.mesh.position.clone(); vector.project(camera3d);
-                        const x = (vector.x * .5 + .5) * window.innerWidth; const y = (vector.y * -.5 + .5) * window.innerHeight;
-                        const label = document.createElement('div'); label.innerText = d.result;
-                        label.style.cssText = `position:absolute; left:${x}px; top:${y}px; transform:translate(-50%,-50%); color:#fff; font-size:32px; font-weight:900; text-shadow:0 2px 5px rgba(0,0,0,0.9), 0 0 10px rgba(255,255,255,0.5); z-index:100; font-family:serif;`;
-                        labelsContainer.appendChild(label);
-                    });
-                    setTimeout(() => { container.style.display = 'none'; labelsContainer.innerHTML = ''; }, 1200);
-                    return;
-                }
-                requestAnimationFrame(animate); frames++;
-                activeDice.forEach(d => {
-                    if(d.mesh.position.y > 0) {
-                        d.vy -= 0.018; d.mesh.position.y += d.vy; d.mesh.position.x += d.vx; d.mesh.position.z += d.vz;
-                        d.mesh.rotation.x += d.rx; d.mesh.rotation.y += d.ry; d.mesh.rotation.z += d.rz;
-                    } else {
-                        if(d.vy < -0.05) { d.vy *= -0.5; d.mesh.position.y = 0; d.rx *= 0.5; d.ry *= 0.5; d.rz *= 0.5; } else d.mesh.position.y = 0;
-                    }
-                });
-                renderer3d.render(scene3d, camera3d);
-            }
-            animate();
+            const diceHtml = results.slice(0, maxAnimated).map((r, idx) => `<div class="true-d20 ${diceCount>1?'small':''}" style="animation-delay:${Math.min(idx*70,260)}ms"><div class="d20-core">${Array.from({length:20},()=>'<span class="ico-face"></span>').join('')}<div class="d20-number">${r}</div></div><div class="dice-impact-ring"></div></div>`).join('');
+            stage.innerHTML = `<div class="dice-cloud">${diceHtml}</div>`; stage.classList.add('active');
+            setTimeout(() => stage.classList.remove('active'), 1080); setTimeout(() => { if(!stage.classList.contains('active')) stage.innerHTML = ''; }, 1280);
         }
 
         // ================= Supabase 网络与消息拉取系统 =================
@@ -799,7 +927,6 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qcGxndGt0aGRlcXlxeHVuY3ZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNzc4NzksImV4cCI6MjA5Mjg1Mzg3OX0.B6jYQD2G8OVEK0sIniC2FJq5d3VHPUYu1dZlhZuB6Mc';
         const IMGBB_API_KEY = 'D05b5a3afc2aae920337cd5de3246b53';
         const SESSION_KEY = 'trpg_supabase_session_v1';
-        const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23999'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
         const supa = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } }) : null;
         let supaState = { account: null, profile: null, activeRoomId: null, roomChannel: null, roomReloadTimer: null };
 
@@ -934,6 +1061,9 @@
             if(e) e.stopPropagation();
             const room = appData.campaigns.find(r => r.id === roomId) || { id: roomId, name: roomName || '聊天室' };
             supaState.activeRoomId = room.id; document.getElementById('in-camp-title').innerText = room.name || roomName || '聊天室';
+            // 每次进房重置侧边栏状态
+            document.getElementById('right-sidebar-wrap').classList.add('collapsed');
+            document.querySelector('.sidebar-toggle').innerText = '◀';
             navigateTo('view-campaign'); await joinRoom(room.id);
         }
 
@@ -942,7 +1072,7 @@
         
         async function exitCampaign() {
             const box = document.getElementById('chat-box');
-            if (supaState.activeRoomId) chatScrollMem[supaState.activeRoomId] = box.scrollTop; // 退出时记录当前房间的滑动进度
+            if (supaState.activeRoomId) chatScrollMem[supaState.activeRoomId] = box.scrollTop;
             supaState.activeRoomId = null;
             if(supaState.roomChannel && supa) { try { await supa.removeChannel(supaState.roomChannel); } catch {} supaState.roomChannel = null; }
             navigateTo('view-main');
@@ -1010,9 +1140,7 @@
             const roomId = supaState.activeRoomId;
             const isInitialLoad = (!box.dataset.renderedFor || box.dataset.renderedFor !== roomId);
             
-            if(isInitialLoad) {
-                box.innerHTML = ''; box.dataset.renderedFor = roomId; unreadCount = 0; updateUnreadBubble();
-            }
+            if(isInitialLoad) { box.innerHTML = ''; box.dataset.renderedFor = roomId; unreadCount = 0; updateUnreadBubble(); }
             if (rows.length > 0) { const welcome = box.querySelector('.welcome-msg'); if (welcome) welcome.remove(); } 
             else if (rows.length === 0 && isInitialLoad) {
                 box.innerHTML = `<div class="chat-row system welcome-msg" data-msg-id="sys-welcome"><div class="sys-avatar">系统</div><div class="chat-bubble"><div style="font-size:12px; color:#888; margin-bottom:4px;">系统 (System)</div>欢迎来到房间，开始你们的冒险吧。<div class="chat-time">现在</div></div></div>`; return;
@@ -1034,8 +1162,8 @@
             });
 
             if (isInitialLoad) {
-                if (chatScrollMem[roomId] !== undefined) box.scrollTop = chatScrollMem[roomId]; // 恢复上次的滑动记忆进度
-                else box.scrollTop = box.scrollHeight; // 首次进房直接触底
+                if (chatScrollMem[roomId] !== undefined) box.scrollTop = chatScrollMem[roomId];
+                else box.scrollTop = box.scrollHeight;
             } else if (addedCount > 0 && !isAtBottom) updateUnreadBubble();
         }
 
@@ -1048,7 +1176,6 @@
                 html = `<div class="sys-avatar">系统</div><div class="chat-bubble">${content}<div class="chat-time">${timeStr}</div></div>`;
             } else {
                 const isSelf = row.sender_id === getCurrentAccountId(); const senderProfile = profilesMap?.[row.sender_id] || null;
-                // 利用 body 里固化的 char_name 与 avatar 实现角色扮演头像的历史隔离
                 const finalName = parsed.char_name || senderProfile?.display_name || (isSelf ? getCurrentDisplayName() : '匿名');
                 const finalAvatar = parsed.char_avatar || senderProfile?.avatar_url || (isSelf ? getCurrentAvatar() : DEFAULT_AVATAR);
                 const text = cleanText(parsed?.text); const bodyHtml = `<div>${escapeHtml(text)}</div>`;
@@ -1073,8 +1200,6 @@
             try {
                 const roomId = supaState.activeRoomId; const accountId = getCurrentAccountId(); if(!roomId) return;
                 const roll = parseDiceCommand(text); 
-                
-                // 给消息包裹当前角色的装扮
                 const char = getActiveChar();
                 const bodyObj = { type: 'text', text: text || '' };
                 if (char) { bodyObj.char_name = char.name; bodyObj.char_avatar = char.avatar_url || DEFAULT_AVATAR; }
@@ -1131,7 +1256,7 @@
         async function initApp() {
             const savedData = localStorage.getItem(STORAGE_KEY); if(savedData) { try { appData = JSON.parse(savedData); } catch {} }
             if(!appData.profile) appData.profile = { nickname: '流浪调查员', signature: '愿骰子之神保佑...', avatar: DEFAULT_AVATAR };
-            renderProfile(); renderCharacterList(); initCreateCharModal(); init3D();
+            renderProfile(); renderCharacterList(); initCreateCharModal(); bindQualityOfLifeEvents();
             const session = getSession();
             if(session?.accountId) {
                 try {
@@ -1139,6 +1264,12 @@
                     await loadRoomsFromSupabase(); await loadCharactersFromSupabase();
                 } catch (err) { clearSession(); navigateTo('view-login'); }
             } else { navigateTo('view-login'); }
+        }
+
+        function bindQualityOfLifeEvents() {
+            const msgInput = document.getElementById('msg-input');
+            if(msgInput && !msgInput.dataset.bound) { msgInput.dataset.bound = '1'; msgInput.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }); }
+            window.addEventListener('pointerup', stopHoldStat); window.addEventListener('blur', stopHoldStat);
         }
 
         window.onload = function(){ initApp(); };
