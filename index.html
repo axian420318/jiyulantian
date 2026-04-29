@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
     <title>蓝天系跑团平台</title>
     
-    <!-- 引入 Three.js 核心库与插件 (基于您的要求使用 ES Module Importmap) -->
+    <!-- 引入 Three.js 核心库与插件 -->
     <script type="importmap">
       {
         "imports": {
@@ -97,13 +97,13 @@
         .player-msg-wrap .chat-bubble { max-width:100%; }
         .chat-input-bar:focus-within { box-shadow:0 -4px 14px rgba(90,75,60,.12); }
 
-        /* 侧边栏及折叠交互 */
-        .right-sidebar-wrap { display: flex; position: relative; z-index: 10; height: 100%; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        /* 侧边栏及折叠交互 (绝对定位悬浮层) */
+        .right-sidebar-wrap { display: flex; position: absolute; right: 0; top: 0; bottom: 0; z-index: 10; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .right-sidebar-wrap.collapsed { transform: translateX(100%); }
-        .right-sidebar { width: 56px; background: #fdfaf4; border-left: 1px solid #d4c2a7; display: flex; flex-direction: column; align-items: center; padding-top: 15px; gap: 15px; box-shadow: -2px 0 5px rgba(0,0,0,0.05); height: 100%;}
-        .sidebar-btn { width: 44px; height: 44px; border-radius: 8px; background: #e8dcc8; color: var(--ink-dark); display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; border: 1px solid #c8b79f; transition: 0.15s; }
+        .right-sidebar { width: 56px; background: rgba(253, 250, 244, 0.92); backdrop-filter: blur(5px); border-left: 1px solid rgba(212,194,167,0.6); display: flex; flex-direction: column; align-items: center; padding-top: 15px; gap: 15px; box-shadow: -4px 0 15px rgba(0,0,0,0.08); height: 100%;}
+        .sidebar-btn { width: 44px; height: 44px; border-radius: 8px; background: rgba(232, 220, 200, 0.9); color: var(--ink-dark); display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; border: 1px solid #c8b79f; transition: 0.15s; }
         .sidebar-btn:active { transform: scale(0.9); background: #d4b892; }
-        .sidebar-toggle { position: absolute; left: -22px; top: 50%; transform: translateY(-50%); width: 22px; height: 60px; background: #fdfaf4; border: 1px solid #d4c2a7; border-right: none; border-radius: 8px 0 0 8px; box-shadow: -2px 0 4px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; color: #888;}
+        .sidebar-toggle { position: absolute; left: -22px; top: 50%; transform: translateY(-50%); width: 22px; height: 60px; background: rgba(253, 250, 244, 0.95); border: 1px solid #d4c2a7; border-right: none; border-radius: 8px 0 0 8px; box-shadow: -3px 0 6px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; color: #888;}
 
         /* ================= 4. 抽屉与模态框 ================= */
         .drawer { position: absolute; top: 0; bottom: 0; width: 75%; max-width: 320px; background: #fdfaf4; z-index: 100; padding: 20px; box-shadow: 0 0 20px rgba(0,0,0,0.2); transition: transform 0.3s; will-change: transform; overflow-y:auto; }
@@ -241,7 +241,6 @@
             scene = new THREE.Scene();
 
             const aspect = window.innerWidth / window.innerHeight;
-            // 采用正交或透视均可，这里按您提供的参考稍作修改适应屏幕
             camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 100);
             camera.position.set(0, 15, 0); 
             camera.lookAt(0, 0, 0);
@@ -300,23 +299,17 @@
             let activeDice = [];
             for(let i=0; i<Math.min(diceCount, maxAnimated); i++) {
                 let mesh = diceGLTF.clone();
-                // 随机初始位置和高度
                 mesh.position.set((Math.random()-0.5)*10, 10 + Math.random()*5, (Math.random()-0.5)*10);
                 scene.add(mesh);
                 activeDice.push({ 
-                    mesh, 
-                    vx: (Math.random()-0.5)*0.3, 
-                    vy: -0.2 - Math.random()*0.3, 
-                    vz: (Math.random()-0.5)*0.3, 
-                    rx: Math.random()*0.5, ry: Math.random()*0.5, rz: Math.random()*0.5, 
-                    result: results[i] 
+                    mesh, vx: (Math.random()-0.5)*0.3, vy: -0.2 - Math.random()*0.3, vz: (Math.random()-0.5)*0.3, 
+                    rx: Math.random()*0.5, ry: Math.random()*0.5, rz: Math.random()*0.5, result: results[i] 
                 });
             }
             
-            let frames = 0;
-            let animationId;
+            let frames = 0; let animationId;
             function animate() {
-                if(frames > 80) { // 约 1.3 秒后停止翻滚并展示悬浮字
+                if(frames > 80) {
                     cancelAnimationFrame(animationId);
                     const labelsContainer = document.getElementById('three-labels'); labelsContainer.innerHTML = '';
                     activeDice.forEach(d => {
@@ -331,22 +324,13 @@
                 }
                 animationId = requestAnimationFrame(animate); frames++;
                 
-                // 模拟简单的重力与碰撞
                 activeDice.forEach(d => {
                     if(d.mesh.position.y > 0) {
-                        d.vy -= 0.02; // 重力
-                        d.mesh.position.y += d.vy; d.mesh.position.x += d.vx; d.mesh.position.z += d.vz;
+                        d.vy -= 0.02; d.mesh.position.y += d.vy; d.mesh.position.x += d.vx; d.mesh.position.z += d.vz;
                         d.mesh.rotation.x += d.rx; d.mesh.rotation.y += d.ry; d.mesh.rotation.z += d.rz;
                     } else {
-                        // 触底反弹
-                        if(d.vy < -0.05) { 
-                            d.vy *= -0.6; // 反弹损耗
-                            d.mesh.position.y = 0.1; 
-                            d.rx *= 0.6; d.ry *= 0.6; d.rz *= 0.6; 
-                        } else {
-                            d.mesh.position.y = 0;
-                            d.rx *= 0.8; d.ry *= 0.8; d.rz *= 0.8; 
-                        }
+                        if(d.vy < -0.05) { d.vy *= -0.6; d.mesh.position.y = 0.1; d.rx *= 0.6; d.ry *= 0.6; d.rz *= 0.6; } 
+                        else { d.mesh.position.y = 0; d.rx *= 0.8; d.ry *= 0.8; d.rz *= 0.8; }
                     }
                 });
                 renderer.render(scene, camera);
@@ -354,7 +338,6 @@
             animate();
         };
 
-        // 启动 3D 引擎
         init3D();
     </script>
 
@@ -405,7 +388,7 @@
         </div>
     </div>
 
-    <!-- ================= 3. 跑团内页 (聊天室与统一右侧栏) ================= -->
+    <!-- ================= 3. 跑团内页 ================= -->
     <div id="view-campaign" class="view">
         <div class="camp-header">
             <button class="header-btn" style="padding:6px 10px;" onclick="exitCampaign()">
@@ -414,21 +397,17 @@
             <div id="in-camp-title" style="font-weight: bold; font-size:16px; flex:1; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:15px;">房间</div>
         </div>
 
-        <div style="display:flex; flex:1; overflow:hidden; position:relative;">
-            <!-- 左侧：聊天区与输入区 -->
-            <div style="flex:1; display:flex; flex-direction:column; position:relative;">
-                <div class="chat-area" id="chat-box"></div>
-                <!-- 未读消息气泡 -->
-                <div id="unread-bubble" onclick="scrollToBottom()" style="display:none; position:absolute; bottom:65px; left:50%; transform:translateX(-50%); background:var(--red-btn); color:#fff; padding:6px 16px; border-radius:20px; font-size:12px; font-weight:bold; box-shadow:0 4px 10px rgba(0,0,0,0.3); cursor:pointer; z-index:10; white-space:nowrap;">
-                    ↓ 0 条新消息
-                </div>
-                <div class="chat-input-bar" style="gap:8px; align-items:center;">
-                    <input type="text" class="chat-input" id="msg-input" placeholder="请输入消息...">
-                    <button class="primary-btn" style="white-space:nowrap; padding: 12px 16px;" onmousedown="event.preventDefault(); sendMsg()" ontouchstart="event.preventDefault(); sendMsg()">发送</button>
-                </div>
+        <!-- 聊天主视窗与侧边悬浮栏 -->
+        <div style="flex:1; position:relative; overflow:hidden; display:flex; flex-direction:column;">
+            
+            <div class="chat-area" id="chat-box"></div>
+            
+            <!-- 未读消息气泡 -->
+            <div id="unread-bubble" onclick="scrollToBottom()" style="display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:var(--red-btn); color:#fff; padding:6px 16px; border-radius:20px; font-size:12px; font-weight:bold; box-shadow:0 4px 10px rgba(0,0,0,0.3); cursor:pointer; z-index:10; white-space:nowrap;">
+                ↓ 0 条新消息
             </div>
             
-            <!-- 右侧：带有折叠功能的侧栏 -->
+            <!-- 右侧：带有折叠功能的悬浮侧栏 -->
             <div class="right-sidebar-wrap collapsed" id="right-sidebar-wrap">
                 <div class="sidebar-toggle" onclick="toggleSidebar()">◀</div>
                 <div class="right-sidebar">
@@ -450,6 +429,12 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- 底部输入框，独立横向拉满整个屏幕宽度 -->
+        <div class="chat-input-bar" style="gap:8px; align-items:center; position:relative; z-index:20;">
+            <input type="text" class="chat-input" id="msg-input" placeholder="请输入消息...">
+            <button class="primary-btn" style="white-space:nowrap; padding: 12px 16px;" onmousedown="event.preventDefault(); sendMsg()" ontouchstart="event.preventDefault(); sendMsg()">发送</button>
         </div>
     </div>
 
@@ -497,6 +482,14 @@
             <div style="font-size:13px; color:#8a7156; margin-bottom:5px;">当前扮演角色</div>
             <div id="vu-char-header" style="font-weight:bold; font-size:18px; color:var(--ink-dark); margin-bottom:15px;"></div>
             <div id="vu-char-stats"></div>
+            <div style="margin-top:15px; border-top:1px dashed #d4c2a7; padding-top:10px;">
+                <div style="font-size:13px; color:#8a7156; margin-bottom:5px; font-weight:bold;">背包物品</div>
+                <div id="vu-char-inventory" style="font-size:14px; color:var(--ink-dark); line-height:1.5;"></div>
+            </div>
+            <div style="margin-top:15px; border-top:1px dashed #d4c2a7; padding-top:10px;">
+                <div style="font-size:13px; color:#8a7156; margin-bottom:5px; font-weight:bold;">背景故事</div>
+                <div id="vu-char-background" style="font-size:14px; color:var(--ink-dark); line-height:1.5;"></div>
+            </div>
         </div>
         <button class="primary-btn secondary-btn" style="width:100%; margin-top:15px;" onclick="closeAll()">关闭</button>
     </div>
@@ -531,6 +524,7 @@
             <div class="form-group" style="flex:2; margin:0;"><input type="text" id="char-name" class="form-input" placeholder="角色名 (如:亚瑟)"></div>
             <div class="form-group" style="flex:1; margin:0;"><input type="text" id="char-class" class="form-input" placeholder="职业"></div>
         </div>
+        <div class="form-group"><label>背景故事</label><textarea id="char-background" class="form-input" style="height:60px; resize:none;" placeholder="角色的过往经历..."></textarea></div>
         <label style="display:block; font-size:13px; color:#666; margin:15px 0 5px;">自定义属性区 (生命、理智等)</label>
         <div id="dynamic-attrs-container"></div>
         <button class="secondary-btn" style="width:100%; margin-bottom:15px; padding:8px; font-size:13px; border-radius:4px; border:1px dashed #aaa;" onclick="addDynamicAttr()">+ 增加一条新属性</button>
@@ -540,14 +534,16 @@
     <!-- 主逻辑脚本 -->
     <script>
         // ================= 数据架构与缓存 =================
-        const STORAGE_KEY = 'trpg_sheep_data_v6';
-        const PROFILE_CACHE_KEY = 'trpg_profiles_cache_v3';
+        const STORAGE_KEY = 'trpg_sheep_data_v7';
+        const PROFILE_CACHE_KEY = 'trpg_profiles_cache_v4';
         const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23999'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
         
         let appData = {
             profile: { nickname: "流浪调查员", signature: "愿骰子之神保佑...", avatar: DEFAULT_AVATAR },
             campaigns:[], characters:[], activeCharId: null
         };
+        // 用于实时同步别人面板的指针
+        window.currentViewingCharId = null;
 
         function saveToLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(appData)); }
         function getTimeStr() { return new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); }
@@ -561,15 +557,21 @@
         function navigateTo(viewId) { document.querySelectorAll('.view').forEach(el => el.classList.remove('active')); document.getElementById(viewId).classList.add('active'); }
         function switchTab(tabId) { document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active')); document.getElementById(tabId).classList.add('active'); document.querySelector(`.nav-item[data-target="${tabId}"]`).classList.add('active'); }
         function openModal(modalId) { document.getElementById(modalId).classList.add('active'); document.getElementById('overlay').classList.add('active'); }
-        function closeAll() { const leftWasOpen = document.getElementById('drawer-left')?.classList.contains('open'); stopHoldStat(); document.querySelectorAll('.drawer').forEach(el => el.classList.remove('open')); document.querySelectorAll('.modal').forEach(el => el.classList.remove('active')); document.getElementById('overlay').classList.remove('active'); if(leftWasOpen) reportStatChanges(); editingCharId = null;}
+        function closeAll() { 
+            const leftWasOpen = document.getElementById('drawer-left')?.classList.contains('open'); 
+            stopHoldStat(); 
+            document.querySelectorAll('.drawer').forEach(el => el.classList.remove('open')); 
+            document.querySelectorAll('.modal').forEach(el => el.classList.remove('active')); 
+            document.getElementById('overlay').classList.remove('active'); 
+            if(leftWasOpen) reportStatChanges(); 
+            editingCharId = null;
+            window.currentViewingCharId = null; // 关闭时清空正在查看的人物ID
+        }
         function toggleSidebar() {
             const wrap = document.getElementById('right-sidebar-wrap');
             const toggleBtn = document.querySelector('.sidebar-toggle');
-            if (wrap.classList.contains('collapsed')) {
-                wrap.classList.remove('collapsed'); toggleBtn.innerText = '▶';
-            } else {
-                wrap.classList.add('collapsed'); toggleBtn.innerText = '◀';
-            }
+            if (wrap.classList.contains('collapsed')) { wrap.classList.remove('collapsed'); toggleBtn.innerText = '▶'; } 
+            else { wrap.classList.add('collapsed'); toggleBtn.innerText = '◀'; }
         }
 
         // 统一多功能面板抽屉
@@ -628,7 +630,6 @@
         }
 
         async function selectActiveChar(charId) { 
-            // 免装备机制：点选已扮演的，则卸下
             if (appData.activeCharId === charId) { appData.activeCharId = null; appData.characters.forEach(c => c.is_active = false); }
             else { appData.activeCharId = charId; appData.characters.forEach(c => c.is_active = (c.id === charId)); }
             renderCharacterList(); saveToLocal(); 
@@ -658,6 +659,7 @@
             document.getElementById('new-char-avatar-img').src = tempNewCharAvatar;
             document.getElementById('char-name').value = char.name;
             document.getElementById('char-class').value = char.role;
+            document.getElementById('char-background').value = char.background || '';
             const container = document.getElementById('dynamic-attrs-container'); container.innerHTML = '';
             (char.stats || []).forEach(s => { container.insertAdjacentHTML('beforeend', getAttrRowHtml(s.key, s.val, s.max, s.isBar, s.color)); });
             openModal('modal-create-char');
@@ -678,7 +680,7 @@
 
         async function syncCharToBackend(charObj, isActive) {
             const uid = getCurrentAccountId(); if(!uid) return;
-            const payload = { id: charObj.id, user_id: uid, name: charObj.name, role: charObj.role || '平民', stats: charObj.stats || [], inventory: charObj.inventory || '', avatar_url: charObj.avatar_url || '', is_active: !!isActive, updated_at: new Date().toISOString() };
+            const payload = { id: charObj.id, user_id: uid, name: charObj.name, role: charObj.role || '平民', background: charObj.background || '', stats: charObj.stats || [], inventory: charObj.inventory || '', avatar_url: charObj.avatar_url || '', is_active: !!isActive, updated_at: new Date().toISOString() };
             try { await api('characters', { method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify(payload) }); } catch(e) {}
         }
 
@@ -709,7 +711,6 @@
         }
 
         function getAttrRowHtml(key='', val='', max='', isBar=false, color='#a32a2a') {
-            // 给行加个红色的删除微标，避免属性乱了删不掉
             return `<div class="attr-row-box">
                 <button style="position:absolute; right:-5px; top:-5px; background:var(--red-btn); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:12px; cursor:pointer;" onclick="this.parentElement.remove()">✕</button>
                 <div style="display:flex; gap:5px; margin-bottom:8px;"><input class="a-key form-input" placeholder="属性名" value="${key}" style="flex:2;"><input class="a-val form-input" type="number" placeholder="当前" value="${val}" style="flex:1;"><input class="a-max form-input" type="number" placeholder="上限" value="${max}" style="flex:1;"></div><div style="display:flex; gap:10px; align-items:center; font-size:12px; font-weight:bold;"><label><input type="checkbox" class="a-isbar" ${isBar?'checked':''} style="transform:scale(1.2); margin-right:5px;">以条状显示</label><input type="color" class="a-color" value="${color}" style="height:24px; border:none; background:none;"></div></div>`;
@@ -719,12 +720,13 @@
             document.getElementById('char-modal-title').innerText = "建立角色档案";
             tempNewCharAvatar = DEFAULT_AVATAR; document.getElementById('new-char-avatar-img').src = DEFAULT_AVATAR;
             document.getElementById('dynamic-attrs-container').innerHTML = getAttrRowHtml('生命', 10, 10, true, '#a32a2a') + getAttrRowHtml('理智', 50, 99, true, '#4a6da7') + getAttrRowHtml('力量', 50, '', false, '#000000'); 
-            document.getElementById('char-name').value=''; document.getElementById('char-class').value='';
+            document.getElementById('char-name').value=''; document.getElementById('char-class').value=''; document.getElementById('char-background').value='';
         }
         function addDynamicAttr() { document.getElementById('dynamic-attrs-container').insertAdjacentHTML('beforeend', getAttrRowHtml()); }
         
         async function saveCharacter() {
-            const name = document.getElementById('char-name').value || "无名"; const role = document.getElementById('char-class').value || "平民"; const stats =[];
+            const name = document.getElementById('char-name').value || "无名"; const role = document.getElementById('char-class').value || "平民"; 
+            const background = document.getElementById('char-background').value || ""; const stats =[];
             document.querySelectorAll('.attr-row-box').forEach(row => {
                 const key = row.querySelector('.a-key').value.trim();
                 if(key) stats.push({ key, val: parseInt(row.querySelector('.a-val').value)||0, max: parseInt(row.querySelector('.a-max').value)||0, isBar: row.querySelector('.a-isbar').checked, color: row.querySelector('.a-color').value });
@@ -732,9 +734,9 @@
             
             if(editingCharId) {
                 const char = appData.characters.find(c => c.id === editingCharId);
-                if(char) { char.name = name; char.role = role; char.stats = stats; char.avatar_url = tempNewCharAvatar; await syncCharToBackend(char, char.id === appData.activeCharId); }
+                if(char) { char.name = name; char.role = role; char.background = background; char.stats = stats; char.avatar_url = tempNewCharAvatar; await syncCharToBackend(char, char.id === appData.activeCharId); }
             } else {
-                const newChar = { id: "char_" + Date.now(), name, role, stats, inventory: "", avatar_url: tempNewCharAvatar };
+                const newChar = { id: "char_" + Date.now(), name, role, background, stats, inventory: "", avatar_url: tempNewCharAvatar };
                 appData.characters.unshift(newChar);
                 if(!appData.activeCharId) appData.activeCharId = newChar.id;
                 await syncCharToBackend(newChar, newChar.id === appData.activeCharId);
@@ -843,29 +845,39 @@
             saveToLocal(); updateStatDOM(idx, c.stats[idx]); renderCharacterList(); syncStatsToBackendDebounced(cId);
         }
 
-        // ================= 查看他人角色 (点击头像) =================
+        // ================= 查看他人角色 (点击头像及实时同步) =================
+        function renderViewUserCharUI(c) {
+            document.getElementById('vu-char-header').innerText = `${escapeHtml(c.name)} (${escapeHtml(c.role || '平民')})`;
+            let statsHtml = '';
+            (c.stats || []).forEach(s => {
+                if(s.isBar) {
+                    let current = parseInt(s.val)||0; let max = parseInt(s.max)||0; let pct = max>0 ? Math.max(0, Math.min(100, (current/max)*100)) : 0;
+                    statsHtml += `<div style="margin-bottom:12px;"><div style="display:flex; justify-content:space-between; font-size:13px; font-weight:bold; margin-bottom:5px;"><span>${escapeHtml(s.key)}</span><span>${current} / ${max||'?'}</span></div><div class="bar-container" style="height:14px; margin-top:0;"><div class="bar-fill" style="width:${pct}%; background-color:${s.color};"></div></div></div>`;
+                } else statsHtml += `<div style="display:inline-block; background:#e8dcc8; border:1px solid #d4c2a7; border-radius:4px; padding:4px 8px; font-size:13px; font-weight:bold; margin:0 5px 8px 0;">${escapeHtml(s.key)} <span style="color:var(--red-btn);">${s.val}</span></div>`;
+            });
+            document.getElementById('vu-char-stats').innerHTML = statsHtml || '<div style="color:#888; font-size:13px;">暂无属性记录。</div>';
+            document.getElementById('vu-char-inventory').innerHTML = escapeHtml(c.inventory || '').replace(/\n/g, '<br>') || '<span style="color:#888;">暂无物品。</span>';
+            document.getElementById('vu-char-background').innerHTML = escapeHtml(c.background || '').replace(/\n/g, '<br>') || '<span style="color:#888;">暂无背景故事。</span>';
+        }
+
         async function viewUserChar(userId) {
             if(!userId) return; openModal('modal-view-user-char');
             document.getElementById('vu-avatar').src = DEFAULT_AVATAR;
             document.getElementById('vu-player-name').innerText = '载入中...';
             document.getElementById('vu-char-header').innerText = '查询中...';
             document.getElementById('vu-char-stats').innerHTML = '';
+            document.getElementById('vu-char-inventory').innerHTML = '';
+            document.getElementById('vu-char-background').innerHTML = '';
 
             try {
                 const profiles = await fetchProfilesMap([userId]); const p = profiles[userId];
                 if(p) { document.getElementById('vu-avatar').src = p.avatar_url || DEFAULT_AVATAR; document.getElementById('vu-player-name').innerText = p.display_name || '无名氏'; }
                 const rows = await api(`characters?user_id=eq.${userId}&is_active=eq.true&limit=1`, { method: 'GET' });
                 if(rows && rows.length > 0) {
-                    const c = rows[0]; document.getElementById('vu-char-header').innerText = `${escapeHtml(c.name)} (${escapeHtml(c.role || '平民')})`;
-                    let statsHtml = '';
-                    (c.stats || []).forEach(s => {
-                        if(s.isBar) {
-                            let current = parseInt(s.val)||0; let max = parseInt(s.max)||0; let pct = max>0 ? Math.max(0, Math.min(100, (current/max)*100)) : 0;
-                            statsHtml += `<div style="margin-bottom:12px;"><div style="display:flex; justify-content:space-between; font-size:13px; font-weight:bold; margin-bottom:5px;"><span>${escapeHtml(s.key)}</span><span>${current} / ${max||'?'}</span></div><div class="bar-container" style="height:14px; margin-top:0;"><div class="bar-fill" style="width:${pct}%; background-color:${s.color};"></div></div></div>`;
-                        } else statsHtml += `<div style="display:inline-block; background:#e8dcc8; border:1px solid #d4c2a7; border-radius:4px; padding:4px 8px; font-size:13px; font-weight:bold; margin:0 5px 8px 0;">${escapeHtml(s.key)} <span style="color:var(--red-btn);">${s.val}</span></div>`;
-                    });
-                    document.getElementById('vu-char-stats').innerHTML = statsHtml || '<div style="color:#888; font-size:13px;">该角色暂无属性记录。</div>';
+                    window.currentViewingCharId = rows[0].id;
+                    renderViewUserCharUI(rows[0]);
                 } else {
+                    window.currentViewingCharId = null;
                     document.getElementById('vu-char-header').innerText = '未扮演任何角色';
                     document.getElementById('vu-char-stats').innerHTML = '<div style="color:#888; font-size:13px;">该玩家当前以旁观者身份游玩。</div>';
                 }
@@ -904,13 +916,9 @@
             const animationTip = roll.diceCount > 5 ? '<div style="font-size:12px; color:#888; margin-top:4px;">(骰子较多已省略重动画)</div>' : '';
             const html = `<div style="font-size:12px; color:#888; margin-bottom:4px;">系统裁决</div><span class="mention">@${escapeHtml(dName)}</span> 执行掷骰 <b>.${escapeHtml(roll.expr)}</b><br><span style="color:#666; font-size:13px;">${escapeHtml(details.join(' '))}</span><br>最终结果：<span style="color:var(--red-btn); font-size:22px; font-weight:900;">${total}</span>${animationTip}`;
             postSysMessage(html); 
-            
-            // 调用通过 module 绑定的真实 3D 动画（内部自带降级机制）
-            if(window.trigger3DDiceRoll) window.trigger3DDiceRoll(results, roll.diceCount);
-            else play2DDiceAnimationFallback(results, roll.diceCount);
+            if(window.trigger3DDiceRoll) window.trigger3DDiceRoll(results, roll.diceCount); else window.play2DDiceAnimationFallback(results, roll.diceCount);
         }
 
-        // 备用的纯 CSS 2D 动画 (万一浏览器不支持 Three.js)
         window.play2DDiceAnimationFallback = function(results, diceCount) {
             const stage = document.getElementById('dice-stage'); const maxAnimated = 3;
             if(diceCount > maxAnimated) {
@@ -1061,7 +1069,6 @@
             if(e) e.stopPropagation();
             const room = appData.campaigns.find(r => r.id === roomId) || { id: roomId, name: roomName || '聊天室' };
             supaState.activeRoomId = room.id; document.getElementById('in-camp-title').innerText = room.name || roomName || '聊天室';
-            // 每次进房重置侧边栏状态
             document.getElementById('right-sidebar-wrap').classList.add('collapsed');
             document.querySelector('.sidebar-toggle').innerText = '◀';
             navigateTo('view-campaign'); await joinRoom(room.id);
@@ -1092,6 +1099,12 @@
             channel.on('broadcast', { event: '*' }, () => { if(supaState.roomReloadTimer) clearTimeout(supaState.roomReloadTimer); supaState.roomReloadTimer = setTimeout(() => loadRoomMessages(roomId), 80); });
             channel.on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages', filter: `room_id=eq.${roomId}` }, () => {
                 if(supaState.roomReloadTimer) clearTimeout(supaState.roomReloadTimer); supaState.roomReloadTimer = setTimeout(() => loadRoomMessages(roomId), 80);
+            });
+            // 强大的新功能：监听别人角色表的改变来动态刷新偷窥面板！
+            channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'characters' }, (payload) => {
+                if (window.currentViewingCharId && payload.new && payload.new.id === window.currentViewingCharId) {
+                    renderViewUserCharUI(payload.new);
+                }
             });
             channel.subscribe(); supaState.roomChannel = channel;
         }
@@ -1256,7 +1269,7 @@
         async function initApp() {
             const savedData = localStorage.getItem(STORAGE_KEY); if(savedData) { try { appData = JSON.parse(savedData); } catch {} }
             if(!appData.profile) appData.profile = { nickname: '流浪调查员', signature: '愿骰子之神保佑...', avatar: DEFAULT_AVATAR };
-            renderProfile(); renderCharacterList(); initCreateCharModal(); bindQualityOfLifeEvents();
+            renderProfile(); renderCharacterList(); initCreateCharModal();
             const session = getSession();
             if(session?.accountId) {
                 try {
@@ -1266,13 +1279,7 @@
             } else { navigateTo('view-login'); }
         }
 
-        function bindQualityOfLifeEvents() {
-            const msgInput = document.getElementById('msg-input');
-            if(msgInput && !msgInput.dataset.bound) { msgInput.dataset.bound = '1'; msgInput.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }); }
-            window.addEventListener('pointerup', stopHoldStat); window.addEventListener('blur', stopHoldStat);
-        }
-
-        window.onload = function(){ initApp(); };
+        window.onload = function(){ initApp(); bindQualityOfLifeEvents(); };
     </script>
 <script src="/Static/js/jquery.js"></script><script src="/Static/js/Global.js"></script><script src="/Web/js/Global.js"></script><script src="/Web/js/SoruxGPT.js"></script></body>
 </html>
