@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -221,7 +220,7 @@
     <!-- 备用 2D 渲染画布层 -->
     <div id="dice-stage" class="dice-stage" aria-hidden="true"></div>
 
-    <!-- ES Module: Three.js 核心逻辑封装 -->
+    <!-- ES Module: Three.js 核心逻辑封装 (只展示随机翻转定格，无碰撞) -->
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -229,47 +228,32 @@
         let scene, camera, renderer, diceGLTF;
         window.is3DReady = false;
 
-        // 初始化 3D 场景
         function init3D() {
             const canvas = document.getElementById('three-canvas');
             renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.shadowMap.enabled = true;
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.2;
 
             scene = new THREE.Scene();
-
             const aspect = window.innerWidth / window.innerHeight;
             camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 100);
-            camera.position.set(0, 15, 0); 
+            camera.position.set(0, 0, 15); 
             camera.lookAt(0, 0, 0);
             
-            // 灯光布置
             scene.add(new THREE.AmbientLight(0x404066, 2.5));
             const keyLight = new THREE.DirectionalLight(0xffffff, 4);
-            keyLight.position.set(5, 8, 5); keyLight.castShadow = true; scene.add(keyLight);
+            keyLight.position.set(5, 8, 5); scene.add(keyLight);
             const fillLight1 = new THREE.DirectionalLight(0xcc88ff, 1.5); fillLight1.position.set(-3, 1, -4); scene.add(fillLight1);
             const fillLight2 = new THREE.DirectionalLight(0x88ccff, 2); fillLight2.position.set(0, -2, 0); scene.add(fillLight2);
 
-            // 加载模型 20d.glb
             new GLTFLoader().load('./20d.glb', (gltf) => {
                 const model = gltf.scene;
                 const box = new THREE.Box3().setFromObject(model);
                 const size = box.getSize(new THREE.Vector3());
                 const maxDim = Math.max(size.x, size.y, size.z);
                 if (maxDim > 3) { const scale = 3 / maxDim; model.scale.set(scale, scale, scale); }
-                
-                model.traverse((child) => {
-                    if (child.isMesh) {
-                        child.castShadow = true; child.receiveShadow = true;
-                        if (child.material) { child.material.roughness = 0.3; child.material.metalness = 0.1; }
-                    }
-                });
                 diceGLTF = model;
                 window.is3DReady = true;
-                console.log("3D Dice model loaded successfully.");
             }, undefined, (e) => console.log('3D model load error, will fallback to 2D CSS'));
             
             window.addEventListener('resize', () => {
@@ -280,7 +264,6 @@
             });
         }
 
-        // 绑定到全局供外部调用
         window.trigger3DDiceRoll = function(results, diceCount) {
             const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             const maxAnimated = ((navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) || window.innerWidth < 380) ? 3 : 5;
@@ -292,52 +275,48 @@
 
             const container = document.getElementById('three-canvas-container');
             container.style.display = 'block';
-            
-            // 清理旧的骰子
             scene.children = scene.children.filter(c => c.isLight || c.isCamera); 
 
             let activeDice = [];
-            for(let i=0; i<Math.min(diceCount, maxAnimated); i++) {
+            const displayCount = Math.min(diceCount, maxAnimated);
+            const spacing = 4;
+            const startX = -(displayCount - 1) * spacing / 2;
+
+            for(let i=0; i<displayCount; i++) {
                 let mesh = diceGLTF.clone();
-                mesh.position.set((Math.random()-0.5)*10, 10 + Math.random()*5, (Math.random()-0.5)*10);
+                mesh.position.set(startX + i * spacing, 0, 0); // 居中横向排开
                 scene.add(mesh);
-                activeDice.push({ 
-                    mesh, vx: (Math.random()-0.5)*0.3, vy: -0.2 - Math.random()*0.3, vz: (Math.random()-0.5)*0.3, 
-                    rx: Math.random()*0.5, ry: Math.random()*0.5, rz: Math.random()*0.5, result: results[i] 
-                });
+                activeDice.push({ mesh, rx: Math.random()*0.5 + 0.2, ry: Math.random()*0.5 + 0.2, result: results[i] });
             }
             
             let frames = 0; let animationId;
             function animate() {
-                if(frames > 80) {
-                    cancelAnimationFrame(animationId);
-                    const labelsContainer = document.getElementById('three-labels'); labelsContainer.innerHTML = '';
-                    activeDice.forEach(d => {
-                        const vector = d.mesh.position.clone(); vector.project(camera);
-                        const x = (vector.x * .5 + .5) * window.innerWidth; const y = (vector.y * -.5 + .5) * window.innerHeight;
-                        const label = document.createElement('div'); label.innerText = d.result;
-                        label.style.cssText = `position:absolute; left:${x}px; top:${y}px; transform:translate(-50%,-50%); color:#fff; font-size:42px; font-weight:900; text-shadow:0 3px 6px rgba(0,0,0,0.9), 0 0 15px rgba(255,255,255,0.6); z-index:100; font-family:serif;`;
-                        labelsContainer.appendChild(label);
-                    });
-                    setTimeout(() => { container.style.display = 'none'; labelsContainer.innerHTML = ''; }, 1500);
-                    return;
+                if(frames === 60) {
+                    activeDice.forEach(d => { d.mesh.rotation.set(0.5, 0.5, 0); }); // 停在一个好看的角度
                 }
-                animationId = requestAnimationFrame(animate); frames++;
-                
-                activeDice.forEach(d => {
-                    if(d.mesh.position.y > 0) {
-                        d.vy -= 0.02; d.mesh.position.y += d.vy; d.mesh.position.x += d.vx; d.mesh.position.z += d.vz;
-                        d.mesh.rotation.x += d.rx; d.mesh.rotation.y += d.ry; d.mesh.rotation.z += d.rz;
-                    } else {
-                        if(d.vy < -0.05) { d.vy *= -0.6; d.mesh.position.y = 0.1; d.rx *= 0.6; d.ry *= 0.6; d.rz *= 0.6; } 
-                        else { d.mesh.position.y = 0; d.rx *= 0.8; d.ry *= 0.8; d.rz *= 0.8; }
+                if(frames > 60) {
+                    if (frames === 61) {
+                        const labelsContainer = document.getElementById('three-labels'); 
+                        labelsContainer.innerHTML = '';
+                        activeDice.forEach(d => {
+                            const vector = d.mesh.position.clone(); vector.project(camera);
+                            const x = (vector.x * .5 + .5) * window.innerWidth; const y = (vector.y * -.5 + .5) * window.innerHeight;
+                            const label = document.createElement('div'); label.innerText = d.result;
+                            label.style.cssText = `position:absolute; left:${x}px; top:${y}px; transform:translate(-50%,-50%); color:#fff; font-size:54px; font-weight:900; text-shadow:0 3px 6px rgba(0,0,0,0.9), 0 0 20px #ffaa00; z-index:100; font-family:serif;`;
+                            labelsContainer.appendChild(label);
+                        });
                     }
-                });
-                renderer.render(scene, camera);
+                    if(frames > 150) { 
+                        cancelAnimationFrame(animationId); container.style.display = 'none'; 
+                        document.getElementById('three-labels').innerHTML = ''; return; 
+                    }
+                } else {
+                    activeDice.forEach(d => { d.mesh.rotation.x += d.rx; d.mesh.rotation.y += d.ry; });
+                }
+                animationId = requestAnimationFrame(animate); frames++; renderer.render(scene, camera);
             }
             animate();
         };
-
         init3D();
     </script>
 
@@ -479,11 +458,11 @@
             </div>
         </div>
         <div id="vu-char-container" style="background:#f4ebd8; border:1px solid #d4c2a7; border-radius:6px; padding:15px;">
-            <div style="font-size:13px; color:#8a7156; margin-bottom:5px;">该玩家当前在本地扮演：</div>
+            <div style="font-size:13px; color:#8a7156; margin-bottom:5px;">当前扮演角色</div>
             <div id="vu-char-header" style="font-weight:bold; font-size:18px; color:var(--ink-dark); margin-bottom:15px;"></div>
             <div id="vu-char-stats"></div>
             <div style="margin-top:15px; border-top:1px dashed #d4c2a7; padding-top:10px;">
-                <div style="font-size:13px; color:#8a7156; margin-bottom:5px; font-weight:bold;">当前房间记录的背包</div>
+                <div style="font-size:13px; color:#8a7156; margin-bottom:5px; font-weight:bold;">背包物品</div>
                 <div id="vu-char-inventory" style="font-size:14px; color:var(--ink-dark); line-height:1.5;"></div>
             </div>
             <div style="margin-top:15px; border-top:1px dashed #d4c2a7; padding-top:10px;">
@@ -525,7 +504,7 @@
             <div class="form-group" style="flex:1; margin:0;"><input type="text" id="char-class" class="form-input" placeholder="职业"></div>
         </div>
         <div class="form-group"><label>背景故事</label><textarea id="char-background" class="form-input" style="height:60px; resize:none;" placeholder="角色的过往经历..."></textarea></div>
-        <label style="display:block; font-size:13px; color:#666; margin:15px 0 5px;">自定义基础属性 (进入跑团时以此为模板)</label>
+        <label style="display:block; font-size:13px; color:#666; margin:15px 0 5px;">自定义属性区 (生命、理智等)</label>
         <div id="dynamic-attrs-container"></div>
         <button class="secondary-btn" style="width:100%; margin-bottom:15px; padding:8px; font-size:13px; border-radius:4px; border:1px dashed #aaa;" onclick="addDynamicAttr()">+ 增加一条新属性</button>
         <div class="form-row"><button class="primary-btn secondary-btn" style="flex:1;" onclick="closeAll()">取消</button><button class="primary-btn" style="flex:1;" onclick="saveCharacter()">保存档案</button></div>
@@ -558,56 +537,78 @@
         function openModal(modalId) { document.getElementById(modalId).classList.add('active'); document.getElementById('overlay').classList.add('active'); }
         function closeAll() { 
             const leftWasOpen = document.getElementById('drawer-left')?.classList.contains('open'); 
-            stopHoldStat(); document.querySelectorAll('.drawer').forEach(el => el.classList.remove('open')); document.querySelectorAll('.modal').forEach(el => el.classList.remove('active')); document.getElementById('overlay').classList.remove('active'); 
-            if(leftWasOpen) reportStatChanges(); editingCharId = null; window.currentViewingCharId = null; 
+            stopHoldStat(); 
+            document.querySelectorAll('.drawer').forEach(el => el.classList.remove('open')); 
+            document.querySelectorAll('.modal').forEach(el => el.classList.remove('active')); 
+            document.getElementById('overlay').classList.remove('active'); 
+            if(leftWasOpen) reportStatChanges(); 
+            editingCharId = null;
+            window.currentViewingCharId = null;
         }
         function toggleSidebar() {
-            const wrap = document.getElementById('right-sidebar-wrap'); const toggleBtn = document.querySelector('.sidebar-toggle');
-            if (wrap.classList.contains('collapsed')) { wrap.classList.remove('collapsed'); toggleBtn.innerText = '▶'; } else { wrap.classList.add('collapsed'); toggleBtn.innerText = '◀'; }
+            const wrap = document.getElementById('right-sidebar-wrap');
+            const toggleBtn = document.querySelector('.sidebar-toggle');
+            if (wrap.classList.contains('collapsed')) { wrap.classList.remove('collapsed'); toggleBtn.innerText = '▶'; } 
+            else { wrap.classList.add('collapsed'); toggleBtn.innerText = '◀'; }
         }
 
-        async function openMultiDrawer(type) {
-            const content = document.getElementById('multi-drawer-content'); const title = document.getElementById('multi-drawer-title');
-            if (type === 'stats') {
-                title.innerText = '角色属性'; const char = getActiveChar();
-                if(!char) content.innerHTML = `<div style="color:#888; text-align:center; margin-top:20px;">当前未扮演任何角色</div>`; else renderLeftDrawer(content, char); 
-            } else if (type === 'inventory') {
-                title.innerText = '背包物品'; const char = getActiveChar();
-                if(!char) content.innerHTML = `<div style="color:#888; text-align:center; margin-top:20px;">当前未扮演任何角色</div>`; else {
-                    const rd = getCharRoomDataSafe(char, supaState.activeRoomId);
-                    content.innerHTML = `<textarea class="form-input" style="height:50vh; resize:none; font-family:inherit; background:#fffaf3; font-size:14px; line-height:1.5; border:1px solid #d4c2a7;" oninput="updateInventory(this.value)" placeholder="在这里记录随身物品、线索、金币...">${escapeHtml(rd.inventory || '')}</textarea>`;
-                }
-            } else if (type === 'dice') {
-                title.innerText = '掷骰面板'; content.innerHTML = document.getElementById('template-dice-panel').innerHTML;
-                const manualInput = document.getElementById('manual-dice-input'); if(manualInput) manualInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') { e.preventDefault(); rollManualFromDrawer(); } });
-            } else if (type === 'info') {
-                title.innerText = '房间信息'; content.innerHTML = '<div style="text-align:center; color:#888; margin-top:20px;">正在加载信息...</div>'; await populateInfoDrawer(content);
+        // ================= 房间数据隔离机制 =================
+        // 这个函数负责根据当前所在的房间，切出属于该房间独立属性和背包。
+        function getRoomChar(char, roomId) {
+            if(!char) return null;
+            if(!roomId) return char; // 不在房间里，直接返回本体
+            if(!char.room_data) char.room_data = {};
+            if(!char.room_data[roomId]) {
+                // 如果这个房间还没有数据，深拷贝一份基础数据作为初始状态
+                char.room_data[roomId] = {
+                    stats: JSON.parse(JSON.stringify(char.stats || [])),
+                    inventory: char.inventory || ''
+                };
             }
+            // 返回一个合并后的虚拟对象，方便前端统一调用
+            return {
+                ...char,
+                stats: char.room_data[roomId].stats,
+                inventory: char.room_data[roomId].inventory
+            };
+        }
+
+        function getActiveCharInRoom() {
+            const char = appData.characters.find(c => c.id === appData.activeCharId) || null;
+            return getRoomChar(char, supaState.activeRoomId);
+        }
+
+        // 统一多功能面板抽屉
+        async function openMultiDrawer(type) {
+            const content = document.getElementById('multi-drawer-content');
+            const title = document.getElementById('multi-drawer-title');
+            
+            if (type === 'stats') {
+                title.innerText = '角色属性';
+                const char = getActiveCharInRoom();
+                if(!char) content.innerHTML = `<div style="color:#888; text-align:center; margin-top:20px;">当前未扮演任何角色</div>`;
+                else renderLeftDrawer(content, char);
+            } else if (type === 'inventory') {
+                title.innerText = '背包物品';
+                const char = getActiveCharInRoom();
+                if(!char) content.innerHTML = `<div style="color:#888; text-align:center; margin-top:20px;">当前未扮演任何角色</div>`;
+                else content.innerHTML = `<textarea class="form-input" style="height:50vh; resize:none; font-family:inherit; background:#fffaf3; font-size:14px; line-height:1.5; border:1px solid #d4c2a7;" oninput="updateInventory(this.value)" placeholder="在这里记录随身物品、线索、金币...">${escapeHtml(char.inventory || '')}</textarea>`;
+            } else if (type === 'dice') {
+                title.innerText = '掷骰面板';
+                content.innerHTML = document.getElementById('template-dice-panel').innerHTML;
+                const manualInput = document.getElementById('manual-dice-input');
+                if(manualInput) manualInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') { e.preventDefault(); rollManualFromDrawer(); } });
+            } else if (type === 'info') {
+                title.innerText = '房间信息';
+                content.innerHTML = '<div style="text-align:center; color:#888; margin-top:20px;">正在加载信息...</div>';
+                await populateInfoDrawer(content);
+            }
+            
             if(type==='stats') captureStatSnapshot(); 
             document.getElementById('drawer-left').classList.add('open'); document.getElementById('overlay').classList.add('active');
         }
 
-        // ================= 核心：房间分身机制 (room_data) =================
-        // 获取/初始化角色当前房间专属数据
-        function getCharRoomDataSafe(char, roomId) {
-            if(!char) return null;
-            if(!roomId) return { stats: char.stats, inventory: char.inventory, background: char.background }; // 没进房用基底
-            if(!char.room_data) char.room_data = {};
-            if(!char.room_data[roomId]) {
-                // 如果这个角色是第一次进这个房，复制基底属性过去！
-                char.room_data[roomId] = {
-                    stats: JSON.parse(JSON.stringify(char.stats || [])),
-                    inventory: char.inventory || '',
-                    background: char.background || ''
-                };
-                syncStatsToBackendDebounced(char.id); // 立刻通知云端我们开了个新分身
-            }
-            return char.room_data[roomId];
-        }
-
         // ================= 角色档案与修改删除 =================
-        function getActiveChar() { return appData.characters.find(c => c.id === appData.activeCharId) || null; }
-        
         function renderCharacterList() {
             const box = document.getElementById('char-list-container');
             if(!appData.characters || appData.characters.length === 0) { box.innerHTML = '<div style="color:#8a7156; text-align:center; padding:15px;">还没有角色，先建一个档案吧。</div>'; return; }
@@ -655,7 +656,7 @@
             e.stopPropagation();
             const char = appData.characters.find(c => c.id === charId); if(!char) return;
             editingCharId = charId;
-            document.getElementById('char-modal-title').innerText = "修改角色模板档案";
+            document.getElementById('char-modal-title').innerText = "修改角色档案";
             tempNewCharAvatar = char.avatar_url || DEFAULT_AVATAR;
             document.getElementById('new-char-avatar-img').src = tempNewCharAvatar;
             document.getElementById('char-name').value = char.name;
@@ -694,33 +695,45 @@
             if(_statSyncTimers[charId]) clearTimeout(_statSyncTimers[charId]);
             _statSyncTimers[charId] = setTimeout(async () => {
                 const c = appData.characters.find(x => x.id === charId); if(!c) return;
-                try { await api(`characters?id=eq.${charId}`, { method: 'PATCH', body: JSON.stringify({ stats: c.stats, room_data: c.room_data, updated_at: new Date().toISOString() }) }); } catch(e) {}
+                try { await api(`characters?id=eq.${charId}`, { method: 'PATCH', body: JSON.stringify({ stats: c.stats, room_data: c.room_data || {}, updated_at: new Date().toISOString() }) }); } catch(e) {}
             }, 1500);
         }
 
         let inventoryTimer = null;
         function updateInventory(val) {
-            const char = getActiveChar(); if(!char) return;
-            const rId = supaState.activeRoomId;
-            if(rId) {
-                let rd = getCharRoomDataSafe(char, rId); rd.inventory = val;
-            } else { char.inventory = val; }
+            const char = appData.characters.find(c => c.id === appData.activeCharId); if(!char) return;
+            const roomId = supaState.activeRoomId;
+            if (roomId) {
+                if(!char.room_data) char.room_data = {};
+                if(!char.room_data[roomId]) char.room_data[roomId] = { stats: JSON.parse(JSON.stringify(char.stats)), inventory: char.inventory || '' };
+                char.room_data[roomId].inventory = val;
+            } else {
+                char.inventory = val;
+            }
             saveToLocal();
+            
             if(inventoryTimer) clearTimeout(inventoryTimer);
-            inventoryTimer = setTimeout(async () => { try { await api(`characters?id=eq.${char.id}`, { method: 'PATCH', body: JSON.stringify({ inventory: char.inventory, room_data: char.room_data, updated_at: new Date().toISOString() }) }); } catch(e) {} }, 1500);
+            inventoryTimer = setTimeout(async () => { try { await api(`characters?id=eq.${char.id}`, { method: 'PATCH', body: JSON.stringify({ inventory: char.inventory, room_data: char.room_data || {}, updated_at: new Date().toISOString() }) }); } catch(e) {} }, 1500);
         }
 
         let tempNewCharAvatar = '';
         async function handleNewCharAvatarUpload(event) {
             const file = event.target.files && event.target.files[0]; if(!file) return;
-            try { const url = await uploadToImgBB(file); tempNewCharAvatar = url; document.getElementById('new-char-avatar-img').src = url; } catch (err) { alert(`上传失败：${err.message}`); } finally { event.target.value = ''; }
+            try {
+                const url = await uploadToImgBB(file);
+                tempNewCharAvatar = url; document.getElementById('new-char-avatar-img').src = url; 
+            } catch (err) { alert(`上传失败：${err.message}`); } finally { event.target.value = ''; }
         }
 
         function getAttrRowHtml(key='', val='', max='', isBar=false, color='#a32a2a') {
-            return `<div class="attr-row-box"><button style="position:absolute; right:-5px; top:-5px; background:var(--red-btn); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:12px; cursor:pointer;" onclick="this.parentElement.remove()">✕</button><div style="display:flex; gap:5px; margin-bottom:8px;"><input class="a-key form-input" placeholder="属性名" value="${key}" style="flex:2;"><input class="a-val form-input" type="number" placeholder="当前" value="${val}" style="flex:1;"><input class="a-max form-input" type="number" placeholder="上限" value="${max}" style="flex:1;"></div><div style="display:flex; gap:10px; align-items:center; font-size:12px; font-weight:bold;"><label><input type="checkbox" class="a-isbar" ${isBar?'checked':''} style="transform:scale(1.2); margin-right:5px;">以条状显示</label><input type="color" class="a-color" value="${color}" style="height:24px; border:none; background:none;"></div></div>`;
+            return `<div class="attr-row-box">
+                <button style="position:absolute; right:-5px; top:-5px; background:var(--red-btn); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:12px; cursor:pointer;" onclick="this.parentElement.remove()">✕</button>
+                <div style="display:flex; gap:5px; margin-bottom:8px;"><input class="a-key form-input" placeholder="属性名" value="${key}" style="flex:2;"><input class="a-val form-input" type="number" placeholder="当前" value="${val}" style="flex:1;"><input class="a-max form-input" type="number" placeholder="上限" value="${max}" style="flex:1;"></div><div style="display:flex; gap:10px; align-items:center; font-size:12px; font-weight:bold;"><label><input type="checkbox" class="a-isbar" ${isBar?'checked':''} style="transform:scale(1.2); margin-right:5px;">以条状显示</label><input type="color" class="a-color" value="${color}" style="height:24px; border:none; background:none;"></div></div>`;
         }
         function initCreateCharModal() { 
-            editingCharId = null; document.getElementById('char-modal-title').innerText = "建立角色档案"; tempNewCharAvatar = DEFAULT_AVATAR; document.getElementById('new-char-avatar-img').src = DEFAULT_AVATAR;
+            editingCharId = null;
+            document.getElementById('char-modal-title').innerText = "建立角色档案";
+            tempNewCharAvatar = DEFAULT_AVATAR; document.getElementById('new-char-avatar-img').src = DEFAULT_AVATAR;
             document.getElementById('dynamic-attrs-container').innerHTML = getAttrRowHtml('生命', 10, 10, true, '#a32a2a') + getAttrRowHtml('理智', 50, 99, true, '#4a6da7') + getAttrRowHtml('力量', 50, '', false, '#000000'); 
             document.getElementById('char-name').value=''; document.getElementById('char-class').value=''; document.getElementById('char-background').value='';
         }
@@ -749,16 +762,14 @@
         // ================= 跑团内部：属性通报与可操作面板 =================
         let statSnapshot = null;
         function captureStatSnapshot() {
-            const char = getActiveChar(); const rId = supaState.activeRoomId; if(!char || !rId) { statSnapshot = null; return; }
-            const rd = getCharRoomDataSafe(char, rId);
-            statSnapshot = { charId: char.id, charName: char.name, stats: JSON.parse(JSON.stringify(rd.stats)) }; // 深拷贝房间属性
+            const char = getActiveCharInRoom(); if(!char) { statSnapshot = null; return; }
+            statSnapshot = { charId: char.id, charName: char.name, stats: char.stats.map(s => ({ key: s.key, val: parseInt(s.val) || 0 })) };
         }
         function reportStatChanges() {
             if(!statSnapshot) return;
-            const char = appData.characters.find(c => c.id === statSnapshot.charId); if(!char) { statSnapshot = null; return; }
-            const rd = getCharRoomDataSafe(char, supaState.activeRoomId);
+            const char = getActiveCharInRoom(); if(!char || char.id !== statSnapshot.charId) { statSnapshot = null; return; }
             const changes = [];
-            rd.stats.forEach((s, idx) => {
+            char.stats.forEach((s, idx) => {
                 const before = statSnapshot.stats[idx]; if(!before || before.key !== s.key) return;
                 const oldVal = parseInt(before.val) || 0; const newVal = parseInt(s.val) || 0; const diff = newVal - oldVal;
                 if(diff !== 0) changes.push({ key:s.key, before:oldVal, after:newVal, diff });
@@ -777,8 +788,7 @@
 
         function renderLeftDrawer(container, char) {
             let html = ``;
-            const rId = supaState.activeRoomId; const rd = getCharRoomDataSafe(char, rId);
-            rd.stats.forEach((s, idx) => {
+            char.stats.forEach((s, idx) => {
                 const current = parseInt(s.val) || 0; const max = parseInt(s.max) || 0;
                 html += `
                 <div class="stat-block" id="stat-block-${idx}">
@@ -837,37 +847,43 @@
         }
         function stopHoldStat() { if(holdTimer) clearTimeout(holdTimer); holdTimer = null; holdStartAt = 0; }
         
-        function modStat(cId, idx, delta) {
-            let c = appData.characters.find(x => x.id === cId); if(!c) return;
-            const rId = supaState.activeRoomId; if(!rId) return; const rd = getCharRoomDataSafe(c, rId);
-            if(!rd.stats[idx]) return;
-            rd.stats[idx].val = (parseInt(rd.stats[idx].val) || 0) + delta;
-            if(rd.stats[idx].isBar && rd.stats[idx].max > 0) rd.stats[idx].val = Math.max(0, Math.min(rd.stats[idx].val, rd.stats[idx].max));
-            saveToLocal(); updateStatDOM(idx, rd.stats[idx]); renderCharacterList(); syncStatsToBackendDebounced(cId);
-        }
-        function setStat(cId, idx, val) {
-            let c = appData.characters.find(x => x.id === cId); if(!c) return;
-            const rId = supaState.activeRoomId; if(!rId) return; const rd = getCharRoomDataSafe(c, rId);
-            if(!rd.stats[idx]) return;
-            rd.stats[idx].val = parseInt(val) || 0;
-            if(rd.stats[idx].isBar && rd.stats[idx].max > 0) rd.stats[idx].val = Math.max(0, Math.min(rd.stats[idx].val, rd.stats[idx].max));
-            saveToLocal(); updateStatDOM(idx, rd.stats[idx]); renderCharacterList(); syncStatsToBackendDebounced(cId);
+        function applyStatChange(cId, idx, valOrDelta, isDelta) {
+            const char = appData.characters.find(x => x.id === cId); if(!char) return;
+            const roomId = supaState.activeRoomId;
+            let targetStats = char.stats;
+            
+            if (roomId) {
+                if(!char.room_data) char.room_data = {};
+                if(!char.room_data[roomId]) char.room_data[roomId] = { stats: JSON.parse(JSON.stringify(char.stats)), inventory: char.inventory || '' };
+                targetStats = char.room_data[roomId].stats;
+            }
+            
+            if(!targetStats[idx]) return;
+            
+            if(isDelta) targetStats[idx].val = (parseInt(targetStats[idx].val) || 0) + valOrDelta;
+            else targetStats[idx].val = parseInt(valOrDelta) || 0;
+            
+            if(targetStats[idx].isBar && targetStats[idx].max > 0) targetStats[idx].val = Math.max(0, Math.min(targetStats[idx].val, targetStats[idx].max));
+            
+            saveToLocal(); updateStatDOM(idx, targetStats[idx]); renderCharacterList(); syncStatsToBackendDebounced(cId);
         }
 
-        // ================= 查看他人角色 (点击头像、渲染及活体同步) =================
+        function modStat(cId, idx, delta) { applyStatChange(cId, idx, delta, true); }
+        function setStat(cId, idx, val) { applyStatChange(cId, idx, val, false); }
+
+        // ================= 查看他人角色 (点击头像及实时同步) =================
         function renderViewUserCharUI(c) {
             document.getElementById('vu-char-header').innerText = `${escapeHtml(c.name)} (${escapeHtml(c.role || '平民')})`;
-            const rd = getCharRoomDataSafe(c, supaState.activeRoomId); // 抽取出对应房间的隔离属性！
             let statsHtml = '';
-            (rd.stats || []).forEach(s => {
+            (c.stats || []).forEach(s => {
                 if(s.isBar) {
                     let current = parseInt(s.val)||0; let max = parseInt(s.max)||0; let pct = max>0 ? Math.max(0, Math.min(100, (current/max)*100)) : 0;
                     statsHtml += `<div style="margin-bottom:12px;"><div style="display:flex; justify-content:space-between; font-size:13px; font-weight:bold; margin-bottom:5px;"><span>${escapeHtml(s.key)}</span><span>${current} / ${max||'?'}</span></div><div class="bar-container" style="height:14px; margin-top:0;"><div class="bar-fill" style="width:${pct}%; background-color:${s.color};"></div></div></div>`;
                 } else statsHtml += `<div style="display:inline-block; background:#e8dcc8; border:1px solid #d4c2a7; border-radius:4px; padding:4px 8px; font-size:13px; font-weight:bold; margin:0 5px 8px 0;">${escapeHtml(s.key)} <span style="color:var(--red-btn);">${s.val}</span></div>`;
             });
             document.getElementById('vu-char-stats').innerHTML = statsHtml || '<div style="color:#888; font-size:13px;">暂无属性记录。</div>';
-            document.getElementById('vu-char-inventory').innerHTML = escapeHtml(rd.inventory || '').replace(/\n/g, '<br>') || '<span style="color:#888;">空空如也。</span>';
-            document.getElementById('vu-char-background').innerHTML = escapeHtml(rd.background || '').replace(/\n/g, '<br>') || '<span style="color:#888;">身世成谜。</span>';
+            document.getElementById('vu-char-inventory').innerHTML = escapeHtml(c.inventory || '').replace(/\n/g, '<br>') || '<span style="color:#888;">暂无物品。</span>';
+            document.getElementById('vu-char-background').innerHTML = escapeHtml(c.background || '').replace(/\n/g, '<br>') || '<span style="color:#888;">暂无背景故事。</span>';
         }
 
         async function viewUserChar(userId) {
@@ -875,7 +891,9 @@
             document.getElementById('vu-avatar').src = DEFAULT_AVATAR;
             document.getElementById('vu-player-name').innerText = '载入中...';
             document.getElementById('vu-char-header').innerText = '查询中...';
-            document.getElementById('vu-char-stats').innerHTML = ''; document.getElementById('vu-char-inventory').innerHTML = ''; document.getElementById('vu-char-background').innerHTML = '';
+            document.getElementById('vu-char-stats').innerHTML = '';
+            document.getElementById('vu-char-inventory').innerHTML = '';
+            document.getElementById('vu-char-background').innerHTML = '';
 
             try {
                 const profiles = await fetchProfilesMap([userId]); const p = profiles[userId];
@@ -883,7 +901,8 @@
                 const rows = await api(`characters?user_id=eq.${userId}&is_active=eq.true&limit=1`, { method: 'GET' });
                 if(rows && rows.length > 0) {
                     window.currentViewingCharId = rows[0].id;
-                    renderViewUserCharUI(rows[0]);
+                    const c = getRoomChar(rows[0], supaState.activeRoomId); // 把别人的数据也做房间切片处理再渲染
+                    renderViewUserCharUI(c);
                 } else {
                     window.currentViewingCharId = null;
                     document.getElementById('vu-char-header').innerText = '未扮演任何角色';
@@ -892,7 +911,7 @@
             } catch(e) { document.getElementById('vu-char-header').innerText = '查询失败'; document.getElementById('vu-char-stats').innerHTML = `<div style="color:#a32a2a; font-size:13px;">网络波动或角色表未就绪。</div>`; }
         }
 
-        // ================= 掷骰与动画 =================
+        // ================= 掷骰逻辑 =================
         function rollManualFromDrawer() { const cmd = document.getElementById('manual-dice-input').value.trim(); if(cmd){ document.getElementById('msg-input').value = cmd.startsWith('.') ? cmd : '.' + cmd; sendMsg(); closeAll(); } }
         function rollQuick(face) { document.getElementById('msg-input').value = `.1d${face}`; sendMsg(); closeAll(); }
 
@@ -927,13 +946,24 @@
             if(window.trigger3DDiceRoll) window.trigger3DDiceRoll(results, roll.diceCount); else window.play2DDiceAnimationFallback(results, roll.diceCount);
         }
 
+        window.play2DDiceAnimationFallback = function(results, diceCount) {
+            const stage = document.getElementById('dice-stage'); const maxAnimated = 3;
+            if(diceCount > maxAnimated) {
+                stage.innerHTML = `<div class="dice-skip-toast">${diceCount} 枚骰子已快速结算</div>`; stage.classList.add('active');
+                setTimeout(() => stage.classList.remove('active'), 760); setTimeout(() => { if(!stage.classList.contains('active')) stage.innerHTML = ''; }, 980); return;
+            }
+            const diceHtml = results.slice(0, maxAnimated).map((r, idx) => `<div class="true-d20 ${diceCount>1?'small':''}" style="animation-delay:${Math.min(idx*70,260)}ms"><div class="d20-core">${Array.from({length:20},()=>'<span class="ico-face"></span>').join('')}<div class="d20-number">${r}</div></div><div class="dice-impact-ring"></div></div>`).join('');
+            stage.innerHTML = `<div class="dice-cloud">${diceHtml}</div>`; stage.classList.add('active');
+            setTimeout(() => stage.classList.remove('active'), 1080); setTimeout(() => { if(!stage.classList.contains('active')) stage.innerHTML = ''; }, 1280);
+        }
+
         // ================= Supabase 网络与消息拉取系统 =================
         const SUPABASE_URL = 'https://mjplgtkthdeqyqxuncvk.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qcGxndGt0aGRlcXlxeHVuY3ZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcyNzc4NzksImV4cCI6MjA5Mjg1Mzg3OX0.B6jYQD2G8OVEK0sIniC2FJq5d3VHPUYu1dZlhZuB6Mc';
         const IMGBB_API_KEY = 'D05b5a3afc2aae920337cd5de3246b53';
         const SESSION_KEY = 'trpg_supabase_session_v1';
         const supa = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } }) : null;
-        let supaState = { account: null, profile: null, activeRoomId: null, roomChannel: null, roomReloadTimer: null, roomCharChannel: null };
+        let supaState = { account: null, profile: null, activeRoomId: null, roomChannel: null, roomReloadTimer: null };
 
         function getSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch { return null; } }
         function saveSession(data) { localStorage.setItem(SESSION_KEY, JSON.stringify(data)); }
@@ -973,7 +1003,8 @@
         async function loginAccount() {
             try {
                 const qq = cleanText(document.getElementById('login-qq')?.value); const password = cleanText(document.getElementById('login-password')?.value);
-                if(!qq || !password) return setAuthStatus('请输入账号和密码。', true); setAuthStatus('正在登录...');
+                if(!qq || !password) return setAuthStatus('请输入账号和密码。', true);
+                setAuthStatus('正在登录...');
                 const rows = await api(`accounts?select=id,qq_number,password_hash&qq_number=eq.${encodeURIComponent(qq)}`, { method: 'GET' });
                 if(!rows?.length) return setAuthStatus('账号不存在，请先注册。', true);
                 if(await sha256(password) !== rows[0].password_hash) return setAuthStatus('密码错误。', true);
@@ -986,7 +1017,8 @@
         async function registerAccount() {
             try {
                 const qq = cleanText(document.getElementById('login-qq')?.value); const password = cleanText(document.getElementById('login-password')?.value);
-                if(!qq || !password) return setAuthStatus('请输入账号和密码。', true); setAuthStatus('正在注册...');
+                if(!qq || !password) return setAuthStatus('请输入账号和密码。', true);
+                setAuthStatus('正在注册...');
                 if((await api(`accounts?select=id&qq_number=eq.${encodeURIComponent(qq)}`, { method: 'GET' }))?.length) return setAuthStatus('这个账号已经存在。', true);
                 const account = (await api('accounts', { method: 'POST', body: JSON.stringify({ qq_number: qq, password_hash: await sha256(password) }) }))?.[0];
                 if(!account?.id) throw new Error('账号创建失败');
@@ -1064,17 +1096,19 @@
             if(e) e.stopPropagation();
             const room = appData.campaigns.find(r => r.id === roomId) || { id: roomId, name: roomName || '聊天室' };
             supaState.activeRoomId = room.id; document.getElementById('in-camp-title').innerText = room.name || roomName || '聊天室';
-            document.getElementById('right-sidebar-wrap').classList.add('collapsed'); document.querySelector('.sidebar-toggle').innerText = '◀';
+            document.getElementById('right-sidebar-wrap').classList.add('collapsed');
+            document.querySelector('.sidebar-toggle').innerText = '◀';
             navigateTo('view-campaign'); await joinRoom(room.id);
         }
 
+        // ================= 退出记忆位置 与 消息增量渲染 =================
         let chatScrollMem = {};
+        
         async function exitCampaign() {
             const box = document.getElementById('chat-box');
             if (supaState.activeRoomId) chatScrollMem[supaState.activeRoomId] = box.scrollTop;
             supaState.activeRoomId = null;
             if(supaState.roomChannel && supa) { try { await supa.removeChannel(supaState.roomChannel); } catch {} supaState.roomChannel = null; }
-            if(supaState.roomCharChannel && supa) { try { await supa.removeChannel(supaState.roomCharChannel); } catch {} supaState.roomCharChannel = null; }
             navigateTo('view-main');
         }
 
@@ -1085,31 +1119,22 @@
                 await loadRoomMessages(roomId); subscribeRoom(roomId);
             } catch (err) { alert(`进入聊天室失败：${err.message}`); }
         }
-        
         function subscribeRoom(roomId) {
             if(!supa) return;
-            // 1. 订阅消息频道
             if(supaState.roomChannel) { try { supa.removeChannel(supaState.roomChannel); } catch {} supaState.roomChannel = null; }
             const channel = supa.channel(`room:${roomId}:messages`);
             channel.on('broadcast', { event: '*' }, () => { if(supaState.roomReloadTimer) clearTimeout(supaState.roomReloadTimer); supaState.roomReloadTimer = setTimeout(() => loadRoomMessages(roomId), 80); });
             channel.on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages', filter: `room_id=eq.${roomId}` }, () => {
                 if(supaState.roomReloadTimer) clearTimeout(supaState.roomReloadTimer); supaState.roomReloadTimer = setTimeout(() => loadRoomMessages(roomId), 80);
             });
-            channel.subscribe(); supaState.roomChannel = channel;
-            
-            // 2. 订阅角色属性变动 (基于你在数据库写的 trigger 发出的 broadcast 频道)
-            if(supaState.roomCharChannel) { try { supa.removeChannel(supaState.roomCharChannel); } catch {} supaState.roomCharChannel = null; }
-            const charChannel = supa.channel(`room:${roomId}:characters`);
-            const handleCharSync = (payload) => {
-                const record = payload.new || payload.record || (payload.payload && payload.payload.new) || payload.payload;
-                if(record && record.id && record.id === window.currentViewingCharId) {
-                    renderViewUserCharUI(record); // 活体更新面板
+            // 强大的新功能：监听别人角色表的改变来动态刷新偷窥面板！
+            channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'characters' }, (payload) => {
+                if (window.currentViewingCharId && payload.new && payload.new.id === window.currentViewingCharId) {
+                    const c = getRoomChar(payload.new, supaState.activeRoomId); // 再次包裹房间隔离状态
+                    renderViewUserCharUI(c);
                 }
-            };
-            charChannel.on('broadcast', { event: 'UPDATE' }, handleCharSync);
-            // 作为容错，也顺便监听标准的 postgres_changes (万一你未来停用触发器)
-            charChannel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'characters' }, handleCharSync);
-            charChannel.subscribe(); supaState.roomCharChannel = charChannel;
+            });
+            channel.subscribe(); supaState.roomChannel = channel;
         }
 
         async function fetchProfilesMap(userIds) {
@@ -1178,7 +1203,8 @@
             });
 
             if (isInitialLoad) {
-                if (chatScrollMem[roomId] !== undefined) box.scrollTop = chatScrollMem[roomId]; else box.scrollTop = box.scrollHeight;
+                if (chatScrollMem[roomId] !== undefined) box.scrollTop = chatScrollMem[roomId];
+                else box.scrollTop = box.scrollHeight;
             } else if (addedCount > 0 && !isAtBottom) updateUnreadBubble();
         }
 
@@ -1214,12 +1240,14 @@
             if(input) input.value = '';
             try {
                 const roomId = supaState.activeRoomId; const accountId = getCurrentAccountId(); if(!roomId) return;
-                const roll = parseDiceCommand(text); const char = getActiveChar();
+                const roll = parseDiceCommand(text); 
+                const char = getActiveCharInRoom();
                 const bodyObj = { type: 'text', text: text || '' };
                 if (char) { bodyObj.char_name = char.name; bodyObj.char_avatar = char.avatar_url || DEFAULT_AVATAR; }
                 
                 await api('chat_messages', { method: 'POST', body: JSON.stringify({ room_id: roomId, sender_id: accountId, body: JSON.stringify(bodyObj) }) });
                 loadRoomMessages(roomId);
+                
                 if(navigator.vibrate && roll) navigator.vibrate(12);
                 if(roll) { setTimeout(() => executeDiceRoll(roll, char?.name), 300); }
             } catch (err) { alert(`发送失败：${err.message}`); }
@@ -1279,7 +1307,14 @@
             } else { navigateTo('view-login'); }
         }
 
+        function bindQualityOfLifeEvents() {
+            const msgInput = document.getElementById('msg-input');
+            if(msgInput && !msgInput.dataset.bound) { msgInput.dataset.bound = '1'; msgInput.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }); }
+            window.addEventListener('pointerup', stopHoldStat); window.addEventListener('blur', stopHoldStat);
+        }
+
         window.onload = function(){ initApp(); };
     </script>
 <script src="/Static/js/jquery.js"></script><script src="/Static/js/Global.js"></script><script src="/Web/js/Global.js"></script><script src="/Web/js/SoruxGPT.js"></script></body>
 </html>
+
