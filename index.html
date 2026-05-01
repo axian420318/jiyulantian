@@ -23,7 +23,7 @@
         :root { --paper-bg: #E8D5B7; --paper-dark: #D4B892; --ink-dark: #2C1E16; --red-btn: #a32a2a; --gold-trim: #5a4b3c; --sys-blue: #4a6da7; }
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
         body, html { height: 100vh; min-height: 100vh; width: 100%; overflow: hidden; background-color: var(--paper-bg); background-image: radial-gradient(circle at 50% 30%, #f1e4d0 0%, var(--paper-dark) 100%); color: var(--ink-dark); display: flex; flex-direction: column; }
-        input, textarea, select { user-select: text; }
+        input, textarea { user-select: text; }
 
         .view { display: none; width: 100%; height: 100%; flex-direction: column; position: absolute; top: 0; left: 0; }
         .view.active { display: flex; }
@@ -103,7 +103,7 @@
         .msg-highlight { animation: highlightMsg 1.2s ease-out forwards; }
         @keyframes highlightMsg { 0%, 50% { background-color: rgba(74, 109, 167, 0.2); } 100% { background-color: transparent; } }
 
-        /* 修改后的输入框与工具栏样式 */
+        /* 修改后的输入框与工具栏样式（去绝对定位，改弹性布局跟随） */
         .chat-input-bar { display: flex; padding: 10px; background: transparent; }
         .chat-input { flex: 1; border: 1px solid #ccc; padding: 8px 10px; border-radius: 4px; outline: none; background: #fff; font-size: 15px;}
         
@@ -237,22 +237,13 @@
         .float-bubble.active-float { animation:float-up-fade 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
         @keyframes float-up-fade { 0% { transform:translate(0, 5px) scale(0.6); opacity:0; } 15% { transform:translate(5px, -8px) scale(1.1); opacity:1; } 100% { transform:translate(10px, -24px) scale(0.9); opacity:0; } }
 
-        .bar-container { position:relative; height:20px; background:#231b14; border-radius:3px; box-shadow:inset 0 2px 5px rgba(0,0,0,0.8); margin-top:10px; border:1px solid #4a3b2c; display: flex; align-items: center; }
+        .bar-container { position:relative; height:20px; background:#231b14; border-radius:3px; box-shadow:inset 0 2px 5px rgba(0,0,0,0.8); margin-top:10px; border:1px solid #4a3b2c; }
         .bar-container::before, .bar-container::after { content:''; position:absolute; top:-3px; bottom:-3px; width:6px; background:linear-gradient(180deg, #e0cca8, #a88d6c, #5a4b3c); border:1px solid #2c1e16; border-radius:2px; z-index:5; box-shadow:0 1px 3px rgba(0,0,0,0.4); }
         .bar-container::before { left:-4px; }
         .bar-container::after { right:-4px; }
-        
-        /* 智能生命条样式 */
-        .bar-fill-wrap { position:absolute; top:0; left:0; bottom:0; width:100%; display:flex; overflow:hidden; border-radius:2px; }
-        .bar-fill { height:100%; transition:width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); position:relative; }
-        .bar-fill.base-hp { z-index: 1; }
-        .bar-fill.shield-hp { background-color: #3498db !important; z-index: 2; position:absolute; left:0; }
-        .bar-fill.temp-hp { background-color: #f1c40f !important; z-index: 3; position:absolute; left:0; }
+        .bar-fill { height:100%; border-radius:2px; transition:width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); position:relative; overflow:hidden; }
         .bar-fill::after { content:''; position:absolute; top:0; left:0; right:0; height:45%; background:linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.05) 100%); border-radius:2px 2px 0 0; }
-        .bar-value-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:800; text-shadow:0 1px 2px #000, 0 0 4px rgba(0,0,0,0.8); z-index:4; pointer-events:none; letter-spacing:0.5px; }
-        
-        .dr-icon-wrap { position:absolute; left:-18px; top:50%; transform:translateY(-50%); display:flex; align-items:center; justify-content:center; z-index:6; }
-        .dr-icon { width:18px; height:20px; background:linear-gradient(145deg, #7f8c8d, #2c3e50); clip-path:polygon(50% 0%, 100% 20%, 100% 80%, 50% 100%, 0% 80%, 0% 20%); display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.5); border:1px solid #bdc3c7; }
+        .bar-value-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:800; text-shadow:0 1px 2px #000, 0 0 4px rgba(0,0,0,0.8); z-index:3; pointer-events:none; letter-spacing:0.5px; }
 
         /* ======== 3D 与备用 2D 骰子画布层 ======== */
         #three-canvas-container { position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; z-index:9999; display:none; background:rgba(0,0,0,0.3); }
@@ -515,11 +506,6 @@
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><circle cx="15.5" cy="15.5" r="1.5"></circle><circle cx="15.5" cy="8.5" r="1.5"></circle><circle cx="8.5" cy="15.5" r="1.5"></circle></svg>
                         <span style="font-size:10px; margin-top:2px;">掷骰</span>
                     </div>
-                    <!-- 新增技能面板 -->
-                    <div class="sidebar-btn" onclick="openMultiDrawer('skill')">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5L3 6l2.5-2.5L17 15l-2.5 2.5z"></path><path d="M15 17l6 6l-2-2l-4-4"></path><path d="M8 6L4 2l2 2l4 4"></path></svg>
-                        <span style="font-size:10px; margin-top:2px;">技能</span>
-                    </div>
                 </div>
             </div>
         </div>
@@ -613,7 +599,7 @@
     <template id="template-dice-panel">
         <h3 style="border-bottom: 1px solid #ddd; padding-bottom:10px; font-size:14px;">手动掷骰</h3>
         <div class="manual-dice-box" style="margin-top:10px;">
-            <input type="text" id="manual-dice-input" class="form-input" value=".1d100" placeholder="例如 .1d3~6 / .3d100≦30 / .2d6×2">
+            <input type="text" id="manual-dice-input" class="form-input" value=".1d100" placeholder="例如 .1d6+3 / .3d100≦30 / .2d6×2">
             <div style="margin-top:10px; display:flex; align-items:center; gap:5px;">
                 <input type="checkbox" id="dice-sum-toggle" onchange="toggleDiceSum(this.checked)" style="transform:scale(1.2);">
                 <label for="dice-sum-toggle" style="font-size:13px; color:#666; font-weight:bold; cursor:pointer;">求和计算 (多骰子相加)</label>
@@ -773,7 +759,6 @@
             <div class="form-group" style="flex:1; margin:0;"><input type="text" id="char-height" class="form-input" placeholder="身高"></div>
             <div class="form-group" style="flex:1; margin:0;"><input type="text" id="char-weight" class="form-input" placeholder="体重"></div>
         </div>
-        <div class="form-group"><label>闪避骰 (例如 .1d100<=50)</label><input type="text" id="char-dodge-dice" class="form-input" placeholder="选填，用于战斗闪避判定"></div>
         <div class="form-group"><label>背景故事</label><textarea id="char-background" class="form-input" style="height:60px; resize:none;" placeholder="角色的过往经历..."></textarea></div>
         <label style="display:block; font-size:13px; color:#666; margin:15px 0 5px;">自定义属性区 (生命、理智等)</label>
         <div id="dynamic-attrs-container"></div>
@@ -1441,21 +1426,6 @@
                 content.innerHTML = '<div style="text-align:center; color:#888; margin-top:20px;">正在加载...</div>';
                 await fetchRoomCombatState();
                 renderCombatUI(content);
-            } else if (type === 'skill') {
-                title.innerText = '技能面板';
-                let targetOptions = window.currentRoomMembers.map(m => {
-                    let c = window.roomActiveChars.find(x => x.user_id === m.user_id);
-                    let name = c ? c.name : m.display_name;
-                    let cId = c ? c.id : m.user_id;
-                    return `<option value="${cId}" data-name="${escapeAttr(name)}">${escapeHtml(name)}</option>`;
-                }).join('');
-                if(!targetOptions) targetOptions = `<option value="">无可用目标</option>`;
-                content.innerHTML = `
-                    <div class="form-group"><label>目标</label><select id="skill-target" class="form-input">${targetOptions}</select></div>
-                    <div class="form-group"><label>攻击段数</label><input type="number" id="skill-hits" class="form-input" value="1" min="1"></div>
-                    <div class="form-group"><label>单段伤害骰</label><input type="text" id="skill-dmg" class="form-input" value="1d6" placeholder="如 1d6+2"></div>
-                    <button class="primary-btn" style="width:100%; margin-top:10px;" onclick="castSkill()">发起攻击</button>
-                `;
             }
             
             if(type==='stats') captureStatSnapshot(); 
@@ -1515,10 +1485,9 @@
             document.getElementById('char-name').value = char.name; document.getElementById('char-class').value = char.role;
             document.getElementById('char-gender').value = char.gender || ''; document.getElementById('char-age').value = char.age || '';
             document.getElementById('char-height').value = char.height_cm || ''; document.getElementById('char-weight').value = char.weight_kg || '';
-            document.getElementById('char-dodge-dice').value = char.dodge_dice || '';
             document.getElementById('char-background').value = char.background || '';
             const container = document.getElementById('dynamic-attrs-container'); container.innerHTML = '';
-            (char.stats || []).forEach(s => { container.insertAdjacentHTML('beforeend', getAttrRowHtml(s.key, s.val, s.max, s.isBar, s.color, s.attr_type)); });
+            (char.stats || []).forEach(s => { container.insertAdjacentHTML('beforeend', getAttrRowHtml(s.key, s.val, s.max, s.isBar, s.color)); });
             openModal('modal-create-char');
         }
 
@@ -1540,7 +1509,7 @@
             const payload = { 
                 id: charObj.id, user_id: uid, name: charObj.name, role: charObj.role || '平民', background: charObj.background || '', 
                 gender: charObj.gender || '', age: charObj.age || '', height_cm: charObj.height_cm || '', weight_kg: charObj.weight_kg || '',
-                stats: charObj.stats || [], inventory: charObj.inventory || '', avatar_url: charObj.avatar_url || '', dodge_dice: charObj.dodge_dice || '',
+                stats: charObj.stats || [], inventory: charObj.inventory || '', avatar_url: charObj.avatar_url || '', 
                 room_data: charObj.room_data || {}, is_active: !!isActive, updated_at: new Date().toISOString() 
             };
             try { await api('characters', { method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates' }, body: JSON.stringify(payload) }); } catch(e) {}
@@ -1576,14 +1545,14 @@
             try { tempNewCharAvatar = await uploadToImgBB(file); document.getElementById('new-char-avatar-img').src = tempNewCharAvatar; } catch (err) { alert(`上传失败`); } finally { event.target.value = ''; }
         }
 
-        function getAttrRowHtml(key='', val='', max='', isBar=false, color='#a32a2a', attrType='none') {
-            return `<div class="attr-row-box"><button style="position:absolute; right:-5px; top:-5px; background:var(--red-btn); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:12px; cursor:pointer;" onclick="this.parentElement.remove()">✕</button><div style="display:flex; gap:5px; margin-bottom:8px;"><input class="a-key form-input" placeholder="属性名" value="${key}" style="flex:2;"><input class="a-val form-input" type="number" placeholder="当前" value="${val}" style="flex:1;"><input class="a-max form-input" type="number" placeholder="上限" value="${max}" style="flex:1;"></div><div style="display:flex; gap:10px; align-items:center; font-size:12px; font-weight:bold;"><label><input type="checkbox" class="a-isbar" ${isBar?'checked':''} style="transform:scale(1.2); margin-right:5px;">以条状显示</label><input type="color" class="a-color" value="${color}" style="height:24px; border:none; background:none; width:24px;"><select class="a-type form-input" style="width:auto; padding:2px 4px; font-size:12px;"><option value="none" ${attrType==='none'?'selected':''}>无特殊</option><option value="hp" ${attrType==='hp'?'selected':''}>生命值主条</option><option value="shield" ${attrType==='shield'?'selected':''}>护盾</option><option value="temp_hp" ${attrType==='temp_hp'?'selected':''}>额外生命</option><option value="dr" ${attrType==='dr'?'selected':''}>减伤</option></select></div></div>`;
+        function getAttrRowHtml(key='', val='', max='', isBar=false, color='#a32a2a') {
+            return `<div class="attr-row-box"><button style="position:absolute; right:-5px; top:-5px; background:var(--red-btn); color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:12px; cursor:pointer;" onclick="this.parentElement.remove()">✕</button><div style="display:flex; gap:5px; margin-bottom:8px;"><input class="a-key form-input" placeholder="属性名" value="${key}" style="flex:2;"><input class="a-val form-input" type="number" placeholder="当前" value="${val}" style="flex:1;"><input class="a-max form-input" type="number" placeholder="上限" value="${max}" style="flex:1;"></div><div style="display:flex; gap:10px; align-items:center; font-size:12px; font-weight:bold;"><label><input type="checkbox" class="a-isbar" ${isBar?'checked':''} style="transform:scale(1.2); margin-right:5px;">以条状显示</label><input type="color" class="a-color" value="${color}" style="height:24px; border:none; background:none;"></div></div>`;
         }
         function initCreateCharModal() { 
             editingCharId = null; document.getElementById('char-modal-title').innerText = "建立角色档案";
             tempNewCharAvatar = DEFAULT_AVATAR; document.getElementById('new-char-avatar-img').src = DEFAULT_AVATAR;
-            document.getElementById('dynamic-attrs-container').innerHTML = getAttrRowHtml('生命', 10, 10, true, '#a32a2a', 'hp') + getAttrRowHtml('护盾', 0, 10, true, '#3498db', 'shield') + getAttrRowHtml('额外生命', 0, 10, true, '#f1c40f', 'temp_hp') + getAttrRowHtml('减伤', 0, '', false, '#7f8c8d', 'dr'); 
-            document.getElementById('char-name').value=''; document.getElementById('char-class').value=''; document.getElementById('char-background').value=''; document.getElementById('char-gender').value=''; document.getElementById('char-age').value=''; document.getElementById('char-height').value=''; document.getElementById('char-weight').value=''; document.getElementById('char-dodge-dice').value='';
+            document.getElementById('dynamic-attrs-container').innerHTML = getAttrRowHtml('生命', 10, 10, true, '#a32a2a') + getAttrRowHtml('理智', 50, 99, true, '#4a6da7') + getAttrRowHtml('力量', 50, '', false, '#000000'); 
+            document.getElementById('char-name').value=''; document.getElementById('char-class').value=''; document.getElementById('char-background').value=''; document.getElementById('char-gender').value=''; document.getElementById('char-age').value=''; document.getElementById('char-height').value=''; document.getElementById('char-weight').value='';
         }
         function addDynamicAttr() { document.getElementById('dynamic-attrs-container').insertAdjacentHTML('beforeend', getAttrRowHtml()); }
         
@@ -1592,19 +1561,18 @@
             const background = document.getElementById('char-background').value || ""; 
             const gender = document.getElementById('char-gender').value || ""; const age = document.getElementById('char-age').value || ""; 
             const height_cm = document.getElementById('char-height').value || ""; const weight_kg = document.getElementById('char-weight').value || ""; 
-            const dodge_dice = document.getElementById('char-dodge-dice').value || ""; 
             const stats =[];
-            document.querySelectorAll('.attr-row-box').forEach(row => { const key = row.querySelector('.a-key').value.trim(); if(key) stats.push({ key, val: parseInt(row.querySelector('.a-val').value)||0, max: parseInt(row.querySelector('.a-max').value)||0, isBar: row.querySelector('.a-isbar').checked, color: row.querySelector('.a-color').value, attr_type: row.querySelector('.a-type').value }); });
+            document.querySelectorAll('.attr-row-box').forEach(row => { const key = row.querySelector('.a-key').value.trim(); if(key) stats.push({ key, val: parseInt(row.querySelector('.a-val').value)||0, max: parseInt(row.querySelector('.a-max').value)||0, isBar: row.querySelector('.a-isbar').checked, color: row.querySelector('.a-color').value }); });
             
             if(editingCharId) {
                 const char = appData.characters.find(c => c.id === editingCharId);
                 if(char) { 
                     char.name = name; char.role = role; char.background = background; char.stats = stats; char.avatar_url = tempNewCharAvatar; 
-                    char.gender = gender; char.age = age; char.height_cm = height_cm; char.weight_kg = weight_kg; char.dodge_dice = dodge_dice;
+                    char.gender = gender; char.age = age; char.height_cm = height_cm; char.weight_kg = weight_kg;
                     await syncCharToBackend(char, char.id === appData.activeCharId); 
                 }
             } else {
-                const newChar = { id: "char_" + Date.now(), name, role, gender, age, height_cm, weight_kg, dodge_dice, background, stats, inventory: "", avatar_url: tempNewCharAvatar, room_data: {} };
+                const newChar = { id: "char_" + Date.now(), name, role, gender, age, height_cm, weight_kg, background, stats, inventory: "", avatar_url: tempNewCharAvatar, room_data: {} };
                 appData.characters.unshift(newChar);
                 if(!appData.activeCharId) appData.activeCharId = newChar.id;
                 await syncCharToBackend(newChar, newChar.id === appData.activeCharId);
@@ -1627,44 +1595,10 @@
 
         function renderLeftDrawer(container, char) {
             let html = ``;
-            // 查找特殊属性以便在生命条渲染时使用
-            const shieldStat = char.stats.find(s => s.attr_type === 'shield');
-            const tempHpStat = char.stats.find(s => s.attr_type === 'temp_hp');
-            const drStat = char.stats.find(s => s.attr_type === 'dr');
-
             char.stats.forEach((s, idx) => {
                 const current = parseInt(s.val) || 0; const max = parseInt(s.max) || 0;
                 html += `<div class="stat-block" id="stat-block-${idx}"><div class="stat-row-title" ${!s.isBar ? 'style="margin-bottom:0;"' : ''}><span class="stat-name">${escapeHtml(s.key)}<div class="bubble-container" id="bubble-container-${idx}"></div></span><div class="stat-controls"><button class="icon-btn" onpointerdown="startHoldStat(event, '${char.id}', ${idx}, -1)">-</button><input class="stat-input" type="number" value="${current}" onchange="setStat('${char.id}', ${idx}, this.value)">${s.isBar ? `<span style="font-size:12px; color:#666;">/ ${max || '?'}</span>` : ''}<button class="icon-btn" onpointerdown="startHoldStat(event, '${char.id}', ${idx}, 1)">+</button></div></div>`;
-                
-                if(s.isBar) {
-                    if (s.attr_type === 'hp' || s.key === '生命') {
-                        let hpMax = max > 0 ? max : 1;
-                        let pctHp = Math.max(0, Math.min(100, (current / hpMax)*100));
-                        
-                        let sVal = shieldStat ? (parseInt(shieldStat.val)||0) : 0;
-                        let pctShield = Math.max(0, Math.min(100, (sVal / hpMax)*100));
-                        let leftShield = pctHp;
-                        
-                        let tVal = tempHpStat ? (parseInt(tempHpStat.val)||0) : 0;
-                        let pctTemp = Math.max(0, Math.min(100, (tVal / hpMax)*100));
-                        let leftTemp = leftShield + pctShield;
-
-                        let drHtml = '';
-                        if (drStat && (parseInt(drStat.val)||0) > 0) {
-                            drHtml = `<div class="dr-icon-wrap"><div class="dr-icon">${parseInt(drStat.val)}</div></div>`;
-                        }
-
-                        html += `<div class="bar-container">${drHtml}<div class="bar-fill-wrap">
-                            <div class="bar-fill base-hp" style="width:${pctHp}%; background-color:${s.color};"></div>
-                            ${sVal > 0 ? `<div class="bar-fill shield-hp" style="width:${pctShield}%; left:${leftShield}%;"></div>` : ''}
-                            ${tVal > 0 ? `<div class="bar-fill temp-hp" style="width:${pctTemp}%; left:${leftTemp}%;"></div>` : ''}
-                        </div><div class="bar-value-label">${current} / ${max || '?'}</div></div>`;
-                    } else {
-                        let pct = max > 0 ? Math.max(0, Math.min(100, (current / max)*100)) : 0; 
-                        html += `<div class="bar-container"><div class="bar-fill" style="width:${pct}%; background-color:${s.color};"></div><div class="bar-value-label">${current} / ${max || '?'}</div></div>`;
-                    }
-                } 
-                html += `</div>`;
+                if(s.isBar) { let pct = max > 0 ? Math.max(0, Math.min(100, (current / max)*100)) : 0; html += `<div class="bar-container"><div class="bar-fill" style="width:${pct}%; background-color:${s.color};"></div><div class="bar-value-label">${current} / ${max || '?'}</div></div>`; } html += `</div>`;
             });
             container.innerHTML = html;
         }
@@ -1672,13 +1606,7 @@
         function updateStatDOM(idx, stat) {
             const block = document.getElementById(`stat-block-${idx}`); if(!block) return;
             const input = block.querySelector('.stat-input'); if(input && input !== document.activeElement) input.value = stat.val;
-            
-            // 为了简化，若有变动且是条状，直接重绘整个面板较为安全（处理盾与额外生命的联动）
-            const char = getActiveCharInRoom();
-            if (char && stat.isBar && document.getElementById('drawer-left').classList.contains('open') && document.getElementById('multi-drawer-title').innerText === '角色属性') {
-                 renderLeftDrawer(document.getElementById('multi-drawer-content'), char);
-            }
-
+            if(stat.isBar) { const fill = block.querySelector('.bar-fill'); const label = block.querySelector('.bar-value-label'); let max = parseInt(stat.max) || 0; let pct = max > 0 ? Math.max(0, Math.min(100, (stat.val / max)*100)) : 0; if(fill) fill.style.width = `${pct}%`; if(label) label.innerText = `${stat.val} / ${max || '?'}`; }
             let initVal = stat.val; if(statSnapshot && statSnapshot.stats[idx]) initVal = statSnapshot.stats[idx].val; let cumulativeDiff = stat.val - initVal;
             const container = document.getElementById(`bubble-container-${idx}`);
             if(container) {
@@ -1706,63 +1634,6 @@
         }
         function modStat(cId, idx, delta) { applyStatChange(cId, idx, delta, true); }
         function setStat(cId, idx, val) { applyStatChange(cId, idx, val, false); }
-
-        // 智能受击计算
-        function takeDamage(char, totalDmg) {
-            let drStat = char.stats.find(s => s.attr_type === 'dr');
-            let dr = drStat ? parseInt(drStat.val) || 0 : 0;
-            
-            let actualDmg = Math.max(0, totalDmg - dr);
-            if (actualDmg <= 0) return { actualDmg: 0, logs: [`减伤完全抵挡了伤害。`] };
-
-            let remainingDmg = actualDmg;
-            let logs = [];
-            if(dr > 0) logs.push(`被减免了 ${dr} 点，剩余 ${remainingDmg} 点。`);
-
-            let shieldStat = char.stats.find(s => s.attr_type === 'shield');
-            let shieldIdx = shieldStat ? char.stats.findIndex(s => s.attr_type === 'shield') : -1;
-            if (shieldStat && shieldStat.val > 0) {
-                let sVal = parseInt(shieldStat.val);
-                if (sVal >= remainingDmg) {
-                    applyStatChange(char.id, shieldIdx, -remainingDmg, true);
-                    logs.push(`护盾吸收了 ${remainingDmg} 点伤害。`);
-                    remainingDmg = 0;
-                } else {
-                    logs.push(`护盾吸收了 ${sVal} 点伤害并破碎。`);
-                    remainingDmg -= sVal;
-                    applyStatChange(char.id, shieldIdx, 0, false);
-                }
-            }
-
-            if (remainingDmg > 0) {
-                let tempHpStat = char.stats.find(s => s.attr_type === 'temp_hp');
-                let tempHpIdx = tempHpStat ? char.stats.findIndex(s => s.attr_type === 'temp_hp') : -1;
-                if (tempHpStat && tempHpStat.val > 0) {
-                    let tVal = parseInt(tempHpStat.val);
-                    if (tVal >= remainingDmg) {
-                        applyStatChange(char.id, tempHpIdx, -remainingDmg, true);
-                        logs.push(`额外生命承受了 ${remainingDmg} 点伤害。`);
-                        remainingDmg = 0;
-                    } else {
-                        logs.push(`额外生命承受了 ${tVal} 点伤害并消耗殆尽。`);
-                        remainingDmg -= tVal;
-                        applyStatChange(char.id, tempHpIdx, 0, false);
-                    }
-                }
-            }
-
-            if (remainingDmg > 0) {
-                let hpStat = char.stats.find(s => s.attr_type === 'hp' || s.key === '生命');
-                let hpIdx = hpStat ? char.stats.findIndex(s => s.attr_type === 'hp' || s.key === '生命') : -1;
-                if (hpStat && hpIdx !== -1) {
-                    applyStatChange(char.id, hpIdx, -remainingDmg, true);
-                    logs.push(`生命值扣除了 ${remainingDmg} 点。`);
-                } else {
-                    logs.push(`受到真实伤害 ${remainingDmg} 点。`);
-                }
-            }
-            return { actualDmg, logs };
-        }
 
         // ================= 查看他人角色 (实时同步) =================
         function renderViewUserCharUI(c) {
@@ -1860,10 +1731,10 @@
             const leftExpr = comparison ? comparison.left : expr;
             const rightExpr = comparison ? comparison.right : null;
 
-            if (!leftExpr || /[^0-9d~+\-*/().]/.test(leftExpr)) return null;
+            if (!leftExpr || /[^0-9d+\-*/().]/.test(leftExpr)) return null;
             if (rightExpr !== null && (!rightExpr || /[^0-9+\-*/().]/.test(rightExpr))) return null;
 
-            const diceRegex = /(\d*)d(\d+)(?:~(\d+))?/gi;
+            const diceRegex = /(\d*)d(\d+)/gi;
             let match;
             let lastIndex = 0;
             let rebuiltLeft = '';
@@ -1880,26 +1751,19 @@
                 }
 
                 const num = match[1] === '' ? 1 : parseInt(match[1], 10);
-                let face = 0, minFace = 1;
-                if (match[3] !== undefined) {
-                    minFace = parseInt(match[2], 10);
-                    face = parseInt(match[3], 10);
-                } else {
-                    face = parseInt(match[2], 10);
-                }
-                
-                if (!Number.isInteger(num) || !Number.isInteger(face) || !Number.isInteger(minFace) || num < 1 || face < minFace || num > 100 || face > 100000) return null;
+                const face = parseInt(match[2], 10);
+                if (!Number.isInteger(num) || !Number.isInteger(face) || num < 1 || face < 2 || num > 100 || face > 100000) return null;
 
                 const rolls = [];
                 for (let i = 0; i < num; i++) {
-                    const r = Math.floor(Math.random() * (face - minFace + 1)) + minFace;
+                    const r = Math.floor(Math.random() * face) + 1;
                     rolls.push(r);
                     allRolls.push(r);
                 }
 
                 const subtotal = rolls.reduce((a, b) => a + b, 0);
                 diceCount += num;
-                terms.push({ type: 'dice', num, minFace, face, rolls, subtotal });
+                terms.push({ type: 'dice', num, face, rolls, subtotal });
                 rebuiltLeft += `(${subtotal})`;
                 processLeft += `${match[0]}=[${rolls.join(', ')}]=${subtotal}`;
                 lastIndex = match.index + match[0].length;
@@ -1965,80 +1829,6 @@
             const diceHtml = results.slice(0, maxAnimated).map((r, idx) => `<div class="true-d20 ${diceCount>1?'small':''}" style="animation-delay:${Math.min(idx*70,260)}ms"><div class="d20-core">${Array.from({length:20},()=>'<span class="ico-face"></span>').join('')}<div class="d20-number">${r}</div></div><div class="dice-impact-ring"></div></div>`).join('');
             stage.innerHTML = `<div class="dice-cloud">${diceHtml}</div>`; stage.classList.add('active');
             setTimeout(() => stage.classList.remove('active'), 1080); setTimeout(() => { if(!stage.classList.contains('active')) stage.innerHTML = ''; }, 1280);
-        }
-
-        // ================= 战斗：攻击技能与闪避 =================
-        async function castSkill() {
-            const targetSelect = document.getElementById('skill-target');
-            if(!targetSelect || !targetSelect.value) return alert("请选择一个有效的目标。");
-            
-            const targetId = targetSelect.value;
-            const targetName = targetSelect.options[targetSelect.selectedIndex].getAttribute('data-name');
-            const hits = parseInt(document.getElementById('skill-hits').value) || 1;
-            const dmgFormula = document.getElementById('skill-dmg').value || '1d6';
-            
-            const roomId = supaState.activeRoomId;
-            const accountId = getCurrentAccountId();
-            const char = getActiveCharInRoom();
-            
-            const payload = {
-                type: 'skill_attack',
-                targetId: targetId,
-                targetName: targetName,
-                hits: hits,
-                dmgFormula: dmgFormula,
-                char_name: char ? char.name : getCurrentDisplayName(),
-                char_avatar: char ? (char.avatar_url || DEFAULT_AVATAR) : getCurrentAvatar()
-            };
-            
-            await api('chat_messages', { method: 'POST', body: JSON.stringify({ room_id: roomId, sender_id: accountId, body: JSON.stringify(payload) }) });
-            loadRoomMessages(roomId);
-            closeAll();
-        }
-
-        async function executeDodge(targetId, hits, dmgFormula) {
-            const char = getActiveCharInRoom();
-            let dodgeCmd = (char && char.dodge_dice) ? char.dodge_dice : '.1d100<=50'; // Fallback
-            
-            if (!dodgeCmd.startsWith('.')) dodgeCmd = '.' + dodgeCmd;
-            let dodgeRoll = parseDiceCommand(dodgeCmd);
-            let dodgeSuccess = false;
-            
-            let processHtml = `<div style="font-size:12px; color:#888;">战斗判定</div><span class="mention">@${escapeHtml(char ? char.name : getCurrentDisplayName())}</span> 进行闪避检定 <b>${escapeHtml(dodgeCmd)}</b><br>`;
-            
-            if (dodgeRoll) {
-                processHtml += `投掷结果: <span style="color:var(--sys-blue); font-weight:bold;">${dodgeRoll.total}</span> (判定: ${dodgeRoll.comparison ? dodgeRoll.comparison.op + dodgeRoll.comparison.threshold : '无条件'})<br>`;
-                dodgeSuccess = dodgeRoll.comparison ? dodgeRoll.successCount > 0 : true;
-            } else {
-                processHtml += `闪避骰格式有误，自动判定失败。<br>`;
-            }
-            
-            if (dodgeSuccess) {
-                processHtml += `<span style="color:#2ecc71; font-weight:bold; font-size:16px;">闪避成功！</span> 完美躲过了攻击。`;
-                postSysMessage(processHtml);
-            } else {
-                processHtml += `<span style="color:var(--red-btn); font-weight:bold; font-size:16px;">闪避失败！</span> 承受伤害结算...<br>`;
-                
-                // Calculate Damage
-                let totalDmg = 0;
-                let dmgDetails = [];
-                for(let i=0; i<hits; i++) {
-                    let f = dmgFormula.startsWith('.') ? dmgFormula : '.' + dmgFormula;
-                    let dRoll = parseDiceCommand(f);
-                    if(dRoll) { totalDmg += dRoll.total; dmgDetails.push(dRoll.total); }
-                }
-                processHtml += `<div style="margin-top:5px; font-size:12px;">伤害骰 (${escapeHtml(dmgFormula)} × ${hits}): [${dmgDetails.join(', ')}] = <b>${totalDmg}</b> 点总伤害。</div>`;
-                
-                if (char) {
-                    captureStatSnapshot();
-                    let dmgLog = takeDamage(char, totalDmg);
-                    processHtml += `<div style="margin-top:5px; color:#8a7156; font-size:12px; border-left:2px solid #ccc; padding-left:5px;">${dmgLog.logs.join('<br>')}</div>`;
-                    postSysMessage(processHtml);
-                    reportStatChanges();
-                } else {
-                    postSysMessage(processHtml);
-                }
-            }
         }
 
         // ================= Supabase 网络与消息拉取系统 =================
@@ -2119,6 +1909,7 @@
             return new File([blob], (file.name || 'sticker').replace(/\.[^.]+$/, '') + '.webp', { type: mimeType });
         }
         async function cropImageFileToSquare(file, { side = 720, quality = 0.8, mimeType = 'image/webp' } = {}) {
+            // 保留旧函数名以兼容历史调用，但实际改为按比例缩放，不再裁切内容
             return compressImageFile(file, { maxSide: side, quality, mimeType });
         }
         function openDirectImagePicker() {
@@ -2222,6 +2013,7 @@
             try {
                 for (const file of files) {
                     if (list.length >= 50) break;
+                    // 表情包按原比例缩放压缩，不再进行 1:1 裁切
                     const prepared = await compressImageFile(file, { maxSide: 1200, quality: 0.86, mimeType: 'image/webp' });
                     const url = await uploadToImgBB(prepared);
                     list.push({ name: (file.name || '表情包').replace(/\.[^.]+$/, ''), url, pinned: false });
@@ -2259,6 +2051,7 @@
             if (files.length > 10) showToast('最多一次发送 10 张，已截取前 10 张。');
             try {
                 for (const file of pick) {
+                    // 普通图片不裁切，限制最长边
                     const compressed = await compressImageFile(file, { maxSide: 1600, quality: 0.86, mimeType: 'image/webp' });
                     const url = await uploadToImgBB(compressed, { expiration: 86400 });
                     await sendDirectImageMessage(url);
@@ -2603,21 +2396,6 @@
                 html = `${cbHtml}<div class="sys-avatar">战斗</div><div class="chat-bubble" ${bindEvents}>
                     <div style="font-weight:bold; color:var(--red-btn); margin-bottom:5px;">发起了战斗对局：${escapeHtml(parsed.name || '未命名')}</div>
                     <button class="primary-btn" style="padding:6px 12px; font-size:13px;" onclick="joinCombatWithD100()">出战 (投掷1d100)</button>
-                </div>`;
-            } else if (parsed && parsed.type === 'skill_attack') {
-                rowClass = 'system'; 
-                const myChar = getActiveCharInRoom();
-                const myId = myChar ? myChar.id : getCurrentAccountId();
-                const isTarget = parsed.targetId === myId;
-                
-                let dodgeBtn = isTarget ? `<button class="primary-btn" style="background:#4a6da7; padding:4px 10px; font-size:12px; margin-top:8px;" onclick="executeDodge('${parsed.targetId}', ${parsed.hits}, '${escapeAttr(parsed.dmgFormula)}')">进行闪避</button>` : '';
-
-                html = `${cbHtml}<div class="sys-avatar" style="background:#a32a2a;">战斗</div><div class="chat-bubble" ${bindEvents}>
-                    <div style="font-weight:bold; color:var(--red-btn); margin-bottom:5px;">
-                        <span class="mention">@${escapeHtml(parsed.char_name)}</span> 对 <span class="mention">@${escapeHtml(parsed.targetName)}</span> 发起了技能攻击！
-                    </div>
-                    <div style="font-size:13px; color:#555;">攻击段数: ${parsed.hits}段 | 单段伤害: ${escapeHtml(parsed.dmgFormula)}</div>
-                    ${dodgeBtn}
                 </div>`;
             } else if (!row.sender_id || (parsed && parsed.type === 'system')) {
                 rowClass = 'system'; const content = parsed.content || parsed.text || '系统消息';
