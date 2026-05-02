@@ -300,7 +300,7 @@
             <svg viewBox="0 0 24 24"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>撤回
         </div>
         <div class="ctx-item" id="ctx-btn-delete" onclick="ctxAction('delete')" style="display:none; color:var(--red-btn);">
-            <svg viewBox="0 0 24 24" stroke="currentColor"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>删除
+            <svg viewBox="0 0 24 24" stroke="currentColor"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"></path></svg>删除
         </div>
         <div class="ctx-item" onclick="ctxAction('screenshot')">
             <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>截图
@@ -419,7 +419,7 @@
     </script>
 
     <!-- ================= 1. 登录大厅 ================= -->
-    <div id="view-login" class="view active">
+    <div id="view-login" class="view">
         <img class="d20-logo hand-drawn-logo" src="http://res.cloudinary.com/dhcon9xbu/image/upload/v1520301821/D20_jup8pj.png" alt="D20 Logo">
         <div class="login-form">
             <input type="text" id="login-qq" class="ink-input" placeholder="账号 / QQ号">
@@ -599,7 +599,7 @@
     <template id="template-dice-panel">
         <h3 style="border-bottom: 1px solid #ddd; padding-bottom:10px; font-size:14px;">手动掷骰</h3>
         <div class="manual-dice-box" style="margin-top:10px;">
-            <input type="text" id="manual-dice-input" class="form-input" value=".1d100" placeholder="例如 .1d6+3 / .3d100≦30 / .2d6×2">
+            <input type="text" id="manual-dice-input" class="form-input" value=".1d100" placeholder="例如 .1d9~12 / .3d100≦30 / .2d6×2">
             <div style="margin-top:10px; display:flex; align-items:center; gap:5px;">
                 <input type="checkbox" id="dice-sum-toggle" onchange="toggleDiceSum(this.checked)" style="transform:scale(1.2);">
                 <label for="dice-sum-toggle" style="font-size:13px; color:#666; font-weight:bold; cursor:pointer;">求和计算 (多骰子相加)</label>
@@ -766,6 +766,23 @@
         <div class="form-row"><button class="primary-btn secondary-btn" style="flex:1;" onclick="closeAll()">取消</button><button class="primary-btn" style="flex:1;" onclick="saveCharacter()">保存档案</button></div>
     </div>
 
+    <!-- 裁切头像弹窗 -->
+    <div id="modal-cropper" class="modal" style="padding: 15px;">
+        <h3 style="margin-bottom: 10px; text-align:center;">裁切头像</h3>
+        <div id="cropper-container" style="position:relative; width:100%; height:260px; background:#e0cca8; overflow:hidden; touch-action:none; user-select:none; border-radius:6px; box-shadow:inset 0 0 10px rgba(0,0,0,0.1);">
+            <img id="cropper-img" src="" style="position:absolute; transform-origin:0 0; pointer-events:none;">
+            <div style="position:absolute; inset:0; pointer-events:none; box-shadow:0 0 0 9999px rgba(0,0,0,0.5); width:200px; height:200px; left:50%; top:50%; transform:translate(-50%, -50%); border:2px solid rgba(255,255,255,0.8); border-radius: 50%;"></div>
+        </div>
+        <div style="margin-top:15px; display:flex; align-items:center; gap:10px;">
+            <span style="font-size:12px; color:#666;">缩放</span>
+            <input type="range" id="cropper-slider" min="0.1" max="3" step="0.01" value="1" style="flex:1;" oninput="onCropperScale(this.value)">
+        </div>
+        <div class="form-row" style="margin-top:20px;">
+            <button class="primary-btn secondary-btn" style="flex:1;" onclick="closeCropper()">取消</button>
+            <button class="primary-btn" style="flex:1;" onclick="confirmCrop()">确定</button>
+        </div>
+    </div>
+
     <!-- 主逻辑脚本 -->
     <script>
         // ================= 数据架构 =================
@@ -929,9 +946,9 @@
             
             // #颜色快捷渲染
             const cMap = { R:'#e74c3c', G:'#2ecc71', B:'#3498db', Y:'#f1c40f', P:'#9b59b6', O:'#e67e22', W:'#ffffff', '红':'#e74c3c', '绿':'#2ecc71', '蓝':'#3498db' };
-            html = html.replace(/(^|\s|>)#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3}|[RGBYPOW红绿蓝])(.*?)($|\n|\s|<)/gi, (match, prefix, code, content, suffix) => {
+            html = html.replace(/(^|\s|>)#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3}|[RGBYPOW红绿蓝])([^\s\n<]+)/gi, (match, prefix, code, content) => {
                 let color = cMap[code.toUpperCase()] || `#${code}`;
-                return `${prefix}<span style="color:${color}; font-weight:bold;">${content}</span>${suffix}`;
+                return `${prefix}<span style="color:${color}; font-weight:bold;">${content}</span>`;
             });
 
             // *特效 (只变蓝，去背景) 遇到换行或引号阻断
@@ -958,6 +975,120 @@
                 const box = document.getElementById('chat-box');
                 box.scrollTop = box.scrollHeight;
             }
+        }
+
+        // ================= 头像裁切 (Cropper) =================
+        let crp = { x: 0, y: 0, scale: 1, initScale: 1, imgW: 0, imgH: 0, startX: 0, startY: 0, isDragging: false };
+        let cropperCallback = null;
+
+        function openCropper(file, callback) {
+            cropperCallback = callback;
+            const url = URL.createObjectURL(file);
+            const img = document.getElementById('cropper-img');
+            
+            img.onload = () => {
+                const container = document.getElementById('cropper-container');
+                const cW = container.clientWidth;
+                const cH = container.clientHeight;
+                const boxSize = 200;
+                
+                crp.imgW = img.naturalWidth;
+                crp.imgH = img.naturalHeight;
+                
+                let scale = boxSize / Math.min(crp.imgW, crp.imgH);
+                crp.initScale = scale;
+                crp.scale = scale;
+                
+                crp.x = (cW - crp.imgW * scale) / 2;
+                crp.y = (cH - crp.imgH * scale) / 2;
+                
+                const slider = document.getElementById('cropper-slider');
+                slider.min = scale * 0.5;
+                slider.max = scale * 4;
+                slider.value = scale;
+                
+                updateCropperTransform();
+                
+                document.getElementById('modal-cropper').classList.add('active');
+                document.getElementById('overlay').classList.add('active');
+            };
+            img.src = url;
+        }
+
+        function closeCropper() {
+            document.getElementById('modal-cropper').classList.remove('active');
+            if (!document.querySelector('.modal.active') && !document.querySelector('.drawer.open')) {
+                document.getElementById('overlay').classList.remove('active');
+            }
+        }
+
+        function updateCropperTransform() {
+            const img = document.getElementById('cropper-img');
+            img.style.transform = `translate(${crp.x}px, ${crp.y}px) scale(${crp.scale})`;
+        }
+
+        function onCropperScale(val) {
+            const newScale = parseFloat(val);
+            const container = document.getElementById('cropper-container');
+            const cx = container.clientWidth / 2;
+            const cy = container.clientHeight / 2;
+            crp.x = cx - (cx - crp.x) * (newScale / crp.scale);
+            crp.y = cy - (cy - crp.y) * (newScale / crp.scale);
+            crp.scale = newScale;
+            updateCropperTransform();
+        }
+
+        function initCropperEvents() {
+            const container = document.getElementById('cropper-container');
+            if(container) {
+                container.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    crp.isDragging = true;
+                    crp.startX = e.clientX - crp.x;
+                    crp.startY = e.clientY - crp.y;
+                    container.setPointerCapture(e.pointerId);
+                });
+                container.addEventListener('pointermove', (e) => {
+                    if (!crp.isDragging) return;
+                    crp.x = e.clientX - crp.startX;
+                    crp.y = e.clientY - crp.startY;
+                    updateCropperTransform();
+                });
+                container.addEventListener('pointerup', (e) => {
+                    crp.isDragging = false;
+                    container.releasePointerCapture(e.pointerId);
+                });
+            }
+        }
+
+        async function confirmCrop() {
+            const img = document.getElementById('cropper-img');
+            const container = document.getElementById('cropper-container');
+            const boxSize = 200;
+            const cW = container.clientWidth;
+            const cH = container.clientHeight;
+            
+            const boxX = (cW - boxSize) / 2;
+            const boxY = (cH - boxSize) / 2;
+            
+            const realX = (boxX - crp.x) / crp.scale;
+            const realY = (boxY - crp.y) / crp.scale;
+            const realW = boxSize / crp.scale;
+            const realH = boxSize / crp.scale;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 400; 
+            canvas.height = 400;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.drawImage(img, realX, realY, realW, realH, 0, 0, 400, 400);
+            
+            canvas.toBlob((blob) => {
+                if(!blob) return alert('裁切失败');
+                let file = new File([blob], "avatar.webp", {type: "image/webp"});
+                closeCropper();
+                if(cropperCallback) cropperCallback(file);
+            }, 'image/webp', 0.85);
         }
 
         // ================= 调色板相关 =================
@@ -1540,9 +1671,30 @@
         }
 
         let tempNewCharAvatar = '';
-        async function handleNewCharAvatarUpload(event) {
+        function handleAvatarUpload(event) {
             const file = event.target.files && event.target.files[0]; if(!file) return;
-            try { tempNewCharAvatar = await uploadToImgBB(file); document.getElementById('new-char-avatar-img').src = tempNewCharAvatar; } catch (err) { alert(`上传失败`); } finally { event.target.value = ''; }
+            if(file.size > 3 * 1024 * 1024) return alert("图片大小不能超过 3MB");
+            openCropper(file, async (croppedFile) => {
+                try {
+                    setAuthStatus('头像上传中...'); const url = await uploadToImgBB(croppedFile); appData.profile.avatar = url || DEFAULT_AVATAR;
+                    if(supaState.profile && supaState.account) {
+                        await api(`profiles?user_id=eq.${encodeURIComponent(supaState.account.id)}`, { method: 'PATCH', body: JSON.stringify({ avatar_url: appData.profile.avatar }) });
+                        supaState.profile.avatar_url = appData.profile.avatar; const cache = loadProfileCache();
+                        if(cache[supaState.account.id]) { cache[supaState.account.id].avatar_url = appData.profile.avatar; saveProfileCache(cache); }
+                    }
+                    renderProfile(); setAuthStatus('头像已更新。');
+                } catch (err) { setAuthStatus(`头像上传失败：${err.message}`, true); }
+            });
+            event.target.value = '';
+        }
+
+        function handleNewCharAvatarUpload(event) {
+            const file = event.target.files && event.target.files[0]; if(!file) return;
+            if(file.size > 3 * 1024 * 1024) return alert("图片大小不能超过 3MB");
+            openCropper(file, async (croppedFile) => {
+                try { tempNewCharAvatar = await uploadToImgBB(croppedFile); document.getElementById('new-char-avatar-img').src = tempNewCharAvatar; } catch (err) { alert(`上传失败`); }
+            });
+            event.target.value = '';
         }
 
         function getAttrRowHtml(key='', val='', max='', isBar=false, color='#a32a2a') {
@@ -1731,10 +1883,10 @@
             const leftExpr = comparison ? comparison.left : expr;
             const rightExpr = comparison ? comparison.right : null;
 
-            if (!leftExpr || /[^0-9d+\-*/().]/.test(leftExpr)) return null;
+            if (!leftExpr || /[^0-9d+\-*/().~]/.test(leftExpr)) return null;
             if (rightExpr !== null && (!rightExpr || /[^0-9+\-*/().]/.test(rightExpr))) return null;
 
-            const diceRegex = /(\d*)d(\d+)/gi;
+            const diceRegex = /(\d*)d(\d+)(?:~(\d+))?/gi;
             let match;
             let lastIndex = 0;
             let rebuiltLeft = '';
@@ -1751,12 +1903,22 @@
                 }
 
                 const num = match[1] === '' ? 1 : parseInt(match[1], 10);
-                const face = parseInt(match[2], 10);
+                let face, minVal = 1;
+
+                if (match[3]) {
+                    let a = parseInt(match[2], 10);
+                    let b = parseInt(match[3], 10);
+                    minVal = Math.min(a, b);
+                    face = Math.max(a, b);
+                } else {
+                    face = parseInt(match[2], 10);
+                }
+
                 if (!Number.isInteger(num) || !Number.isInteger(face) || num < 1 || face < 2 || num > 100 || face > 100000) return null;
 
                 const rolls = [];
                 for (let i = 0; i < num; i++) {
-                    const r = Math.floor(Math.random() * face) + 1;
+                    const r = Math.floor(Math.random() * (face - minVal + 1)) + minVal;
                     rolls.push(r);
                     allRolls.push(r);
                 }
@@ -1813,7 +1975,16 @@
             const dName = charName || appData.profile.nickname;
             const animationTip = roll.diceCount > 5 ? '<div style="font-size:12px; color:#888; margin-top:4px;">(省略重动画)</div>' : '';
 
-            const finalValue = roll.comparison ? String(roll.successCount) : String(roll.total);
+            let finalValue = roll.comparison ? String(roll.successCount) : String(roll.total);
+
+            // 如果未开启求和，且为纯多骰（无加减乘除），且无比较判断
+            if (!appData.settings.diceSum && !roll.comparison && roll.terms.length === 1) {
+                const pureDiceRegex = /^\s*\d*d\d+(?:~\d+)?\s*$/i;
+                if (pureDiceRegex.test(roll.leftExpr) && roll.terms[0].num > 1) {
+                    finalValue = roll.terms[0].rolls.join(', ');
+                }
+            }
+
             const resultDisplay = `<span style="color:var(--red-btn); font-size:20px; font-weight:900;">${escapeHtml(finalValue)}</span>`;
             const processHtml = buildDiceProcessDisplay(roll);
             const rollInfo = roll.comparison ? `<div style="font-size:12px; color:#8a7156; margin-top:4px;">判定条件：${escapeHtml(roll.comparison.op)} ${escapeHtml(String(roll.comparison.threshold))}</div>` : '';
@@ -1890,7 +2061,9 @@
             try {
                 const accountId = getCurrentAccountId();
                 if (!accountId) return;
-                await api(`profiles?user_id=eq.${encodeURIComponent(accountId)}`, { method: 'PATCH', body: JSON.stringify({ sticker_urls: sortStickers(list).slice(0, 50) }) });
+                const sorted = sortStickers(list).slice(0, 50);
+                await api(`profiles?user_id=eq.${encodeURIComponent(accountId)}`, { method: 'PATCH', body: JSON.stringify({ sticker_urls: sorted }) });
+                if (supaState.profile) supaState.profile.sticker_urls = sorted;
             } catch {}
         }
         async function compressImageFile(file, { maxSide = 360, quality = 0.72, mimeType = 'image/webp' } = {}) {
@@ -2013,6 +2186,7 @@
             try {
                 for (const file of files) {
                     if (list.length >= 50) break;
+                    if (file.size > 3 * 1024 * 1024) { alert(`图片 ${file.name} 超过 3MB，已跳过。`); continue; }
                     // 表情包按原比例缩放压缩，不再进行 1:1 裁切
                     const prepared = await compressImageFile(file, { maxSide: 1200, quality: 0.86, mimeType: 'image/webp' });
                     const url = await uploadToImgBB(prepared);
@@ -2051,6 +2225,7 @@
             if (files.length > 10) showToast('最多一次发送 10 张，已截取前 10 张。');
             try {
                 for (const file of pick) {
+                    if (file.size > 3 * 1024 * 1024) { alert(`图片 ${file.name} 超过 3MB，已跳过。`); continue; }
                     // 普通图片不裁切，限制最长边
                     const compressed = await compressImageFile(file, { maxSide: 1600, quality: 0.86, mimeType: 'image/webp' });
                     const url = await uploadToImgBB(compressed, { expiration: 86400 });
@@ -2073,9 +2248,16 @@
             const session = getSession(); if(!session?.accountId) return false;
             const accounts = await api(`accounts?select=id,qq_number&id=eq.${encodeURIComponent(session.accountId)}`, { method: 'GET' }); if(!accounts?.length) return false;
             supaState.account = accounts[0];
-            let rows = await api(`profiles?select=user_id,display_name,avatar_url&user_id=eq.${encodeURIComponent(supaState.account.id)}`, { method: 'GET' });
+            let rows = await api(`profiles?select=user_id,display_name,avatar_url,sticker_urls&user_id=eq.${encodeURIComponent(supaState.account.id)}`, { method: 'GET' });
             if(!rows || !rows.length) rows = await api('profiles', { method: 'POST', body: JSON.stringify({ user_id: supaState.account.id, display_name: supaState.account.qq_number || '无名氏', avatar_url: DEFAULT_AVATAR }) });
             supaState.profile = rows?.[0] || { display_name: supaState.account.qq_number, avatar_url: DEFAULT_AVATAR };
+            
+            if (Array.isArray(supaState.profile.sticker_urls)) {
+                const key = getStickerStorageKey(supaState.account.id);
+                // 每次获取最新 Profile 时，以服务器的表情包列表覆盖本地缓存
+                localStorage.setItem(key, JSON.stringify(supaState.profile.sticker_urls));
+            }
+
             appData.profile.nickname = supaState.profile.display_name || supaState.account.qq_number || '无名氏';
             appData.profile.avatar = supaState.profile.avatar_url || DEFAULT_AVATAR;
             appData.profile.signature = localStorage.getItem(getSignatureKey(supaState.account.id)) || appData.profile.signature || '愿骰子之神保佑...';
@@ -2114,19 +2296,6 @@
         function renderProfile() {
             document.getElementById('display-avatar').src = getCurrentAvatar(); document.getElementById('display-nickname').innerText = getCurrentDisplayName();
             document.getElementById('display-signature').innerText = appData.profile?.signature || ''; document.getElementById('edit-nickname').value = getCurrentDisplayName(); document.getElementById('edit-signature').value = appData.profile?.signature || '';
-        }
-
-        async function handleAvatarUpload(event) {
-            const file = event.target.files && event.target.files[0]; if(!file) return;
-            try {
-                setAuthStatus('头像上传中...'); const url = await uploadToImgBB(file); appData.profile.avatar = url || DEFAULT_AVATAR;
-                if(supaState.profile && supaState.account) {
-                    await api(`profiles?user_id=eq.${encodeURIComponent(supaState.account.id)}`, { method: 'PATCH', body: JSON.stringify({ avatar_url: appData.profile.avatar }) });
-                    supaState.profile.avatar_url = appData.profile.avatar; const cache = loadProfileCache();
-                    if(cache[supaState.account.id]) { cache[supaState.account.id].avatar_url = appData.profile.avatar; saveProfileCache(cache); }
-                }
-                renderProfile(); setAuthStatus('头像已更新。');
-            } catch (err) { setAuthStatus(`头像上传失败：${err.message}`, true); } finally { event.target.value = ''; }
         }
 
         async function saveProfile() {
@@ -2541,12 +2710,13 @@
                 
                 let bgUploadHtml = isOwner ? `<div style="margin-top:15px;"><label class="avatar-edit-label" for="room-bg-upload" style="display:block; text-align:center; color:var(--sys-blue); border-color:var(--sys-blue);">修改聊天室背景图</label><input type="file" id="room-bg-upload" accept="image/*" style="display:none;" onchange="uploadRoomBg(event)"></div>` : '';
 
-                container.innerHTML = `<div style="font-size:14px; color:#555; line-height:1.6;"><p style="margin-bottom:8px;"><strong>当前房间：</strong> <span style="color:var(--ink-dark); font-weight:bold;">${escapeHtml(roomRow?.name || '房间')}</span></p><div style="margin:15px 0; padding:10px; background:#f4ebd8; border-radius:6px; border:1px solid #d4c2a7;"><p style="margin-bottom:8px; color:var(--ink-dark);"><strong>主持人</strong></p><div style="display:flex; align-items:center; gap:10px;"><div style="width:34px; height:34px; border-radius:50%; background:#2c1e16; color:#fff; display:flex; justify-content:center; align-items:center; font-size:12px; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.2);">KP</div><span style="font-weight:bold; color:var(--ink-dark);">${escapeHtml(hostName)}</span></div></div><div style="margin:15px 0; padding:10px; background:#f4ebd8; border-radius:6px; border:1px solid #d4c2a7;"><p style="margin-bottom:8px; color:var(--ink-dark);"><strong>成员列表</strong></p><ul style="list-style:none; padding-left:0; margin:0;">${listHtml}</ul></div>${bgUploadHtml}${isOwner ? `<button class="primary-btn secondary-btn" style="width:100%; color:var(--red-btn); border-color:var(--red-btn); margin-top:10px;" onclick="deleteCurrentRoom()">解散房间</button>` : ''}</div>`;
+                container.innerHTML = `<div style="font-size:14px; color:#555; line-height:1.6;"><p style="margin-bottom:8px;"><strong>当前房间：</strong> <span style="color:var(--ink-dark); font-weight:bold;">${escapeHtml(roomRow?.name || '房间')}</span></p><div style="margin:15px 0; padding:10px; background:#f4ebd8; border-radius:6px; border:1px solid #d4c2a7;"><p style="margin-bottom:8px; color:var(--ink-dark);"><strong>主持人</strong></p><div style="display:flex; align-items:center; gap:10px;"><div style="width:34px; height:34px; border-radius:50%; background:#2c1e16; color:#fff; display:flex; justify-content:center; align-items:center; font-size:12px; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.2);">KP</div><span style="font-weight:bold; color:var(--ink-dark);">${escapeHtml(hostName)}</span></div></div><div style="margin:15px 0; padding:10px; background:#f4ebd8; border-radius:6px; border:1px solid #d4c2a7;"><p style="margin-bottom:8px; color:var(--ink-dark);"><strong>成员列表</strong></p><ul style="list-style:none; padding-left:0; margin:0;">${listHtml}</ul></div>${bgUploadHtml}<button class="primary-btn secondary-btn" style="width:100%; color:var(--red-btn); border-color:var(--red-btn); margin-top:10px;" onclick="leaveCurrentRoom()">离开房间</button>${isOwner ? `<button class="primary-btn secondary-btn" style="width:100%; color:var(--red-btn); border-color:var(--red-btn); margin-top:10px;" onclick="deleteCurrentRoom()">解散房间</button>` : ''}</div>`;
             } catch(e) { container.innerHTML = '<div style="color:var(--red-btn);">加载失败</div>'; }
         }
 
         async function uploadRoomBg(event) {
             const file = event.target.files && event.target.files[0]; if(!file) return;
+            if(file.size > 3 * 1024 * 1024) return alert("图片大小不能超过 3MB");
             try {
                 const url = await uploadToImgBB(file);
                 const roomId = supaState.activeRoomId;
@@ -2560,9 +2730,37 @@
             if(e) e.stopPropagation(); if(!confirm('确定解散这个房间吗？记录与成员都将被抹去。')) return;
             try { await api(`chat_messages?room_id=eq.${encodeURIComponent(roomId)}`, { method: 'DELETE' }).catch(()=>{}); await api(`chat_room_members?room_id=eq.${encodeURIComponent(roomId)}`, { method: 'DELETE' }).catch(()=>{}); await api(`chat_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'DELETE' }); appData.campaigns = (appData.campaigns || []).filter(r => r.id !== roomId); renderCampaigns(); } catch (err) {}
         }
+        
         async function deleteCurrentRoom() {
             const roomId = supaState.activeRoomId; if(!roomId) return; if(!confirm('确定解散当前所在的房间吗？')) return;
             try { if(supaState.roomChannel && supa) { try { await supa.removeChannel(supaState.roomChannel); } catch {} supaState.roomChannel = null; } await api(`chat_messages?room_id=eq.${encodeURIComponent(roomId)}`, { method: 'DELETE' }).catch(()=>{}); await api(`chat_room_members?room_id=eq.${encodeURIComponent(roomId)}`, { method: 'DELETE' }).catch(()=>{}); await api(`chat_rooms?id=eq.${encodeURIComponent(roomId)}`, { method: 'DELETE' }); appData.campaigns = (appData.campaigns || []).filter(r => r.id !== roomId); closeAll(); navigateTo('view-main'); renderCampaigns(); } catch (err) {}
+        }
+
+        async function leaveCurrentRoom() {
+            const roomId = supaState.activeRoomId; 
+            const accountId = getCurrentAccountId();
+            if(!roomId || !accountId) return; 
+            if(!confirm('确定要离开当前所在的房间吗？你的角色在该房间的记录将会被清空。')) return;
+            
+            try { 
+                await api(`chat_room_members?room_id=eq.${encodeURIComponent(roomId)}&user_id=eq.${encodeURIComponent(accountId)}`, { method: 'DELETE' });
+                
+                // 清空该房间的所有角色 room_data
+                for(let char of appData.characters) {
+                    if(char.room_data && char.room_data[roomId]) {
+                        delete char.room_data[roomId];
+                        await api(`characters?id=eq.${char.id}`, { method: 'PATCH', body: JSON.stringify({ room_data: char.room_data, updated_at: new Date().toISOString() }) });
+                    }
+                }
+                saveToLocal();
+
+                appData.campaigns = (appData.campaigns || []).filter(r => r.id !== roomId); 
+                closeAll(); 
+                exitCampaign();
+                renderCampaigns(); 
+            } catch (err) {
+                alert(`离开房间失败：${err.message}`);
+            }
         }
 
         // ================= 初始化与生命周期 =================
@@ -2571,11 +2769,22 @@
             if(!appData.profile) appData.profile = { nickname: '流浪调查员', signature: '愿骰子之神保佑...', avatar: DEFAULT_AVATAR };
             if(!appData.settings) appData.settings = { diceSum: false };
             renderProfile(); renderCharacterList(); initCreateCharModal(); bindQualityOfLifeEvents();
+            initCropperEvents();
             toggleChatPrebar(false);
             const session = getSession();
             if(session?.accountId) {
-                try { await refreshProfileFromServer(); navigateTo('view-main'); await loadRoomsFromSupabase(); await loadCharactersFromSupabase(); } catch (err) { clearSession(); navigateTo('view-login'); }
-            } else { navigateTo('view-login'); }
+                try { 
+                    await refreshProfileFromServer(); 
+                    navigateTo('view-main'); 
+                    await loadRoomsFromSupabase(); 
+                    await loadCharactersFromSupabase(); 
+                } catch (err) { 
+                    clearSession(); 
+                    navigateTo('view-login'); 
+                }
+            } else { 
+                navigateTo('view-login'); 
+            }
         }
 
         function bindQualityOfLifeEvents() {
