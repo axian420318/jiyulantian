@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>卡牌制作</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- html2canvas CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- 引入高品质开源中文字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;700&family=Noto+Serif+SC:wght@400;700&family=ZCOOL+QingKe+HuangYou&display=swap" rel="stylesheet">
+    <style>
+        /* 隐藏滚动条 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* 禁用默认手势防止干扰双指缩放 */
+        .touch-none {
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col lg:flex-row text-slate-800 font-sans">
+
+    <!-- 左侧专业控制面板 -->
+    <div class="w-full lg:w-96 bg-white shadow-xl p-6 flex flex-col justify-between overflow-y-auto no-scrollbar lg:h-screen z-20 border-r border-slate-100">
+        <div class="space-y-6">
+            <div>
+                <h1 class="text-lg font-bold text-slate-900 tracking-wide">卡牌生成器</h1>
+            </div>
+
+            <!-- 1. 卡框管理 -->
+            <div class="border-t border-slate-100 pt-4">
+                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">卡框设置</label>
+                <div class="flex items-center space-x-2">
+                    <input type="file" id="frameInput" accept="image/*" class="hidden" />
+                    <button onclick="document.getElementById('frameInput').click()" class="w-full py-2 px-3 border border-dashed border-slate-300 hover:border-blue-500 rounded text-xs font-medium text-slate-600 hover:text-blue-600 transition-colors bg-slate-50">
+                        更换卡框图片 (1024×1536)
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. 卡面管理 -->
+            <div class="border-t border-slate-100 pt-4 space-y-3">
+                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">卡面设置</label>
+                <input type="file" id="artInput" accept="image/*" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-slate-200 file:text-xs file:font-medium file:bg-slate-50 hover:file:bg-slate-100 file:text-slate-700 cursor-pointer" />
+                <div class="bg-slate-50 p-2.5 rounded text-[11px] text-slate-500 space-y-1">
+                    <p class="font-medium text-slate-700">操作说明：</p>
+                    <p>•单指拖拽平移，双指捏合缩放</p>
+                </div>
+            </div>
+
+            <!-- 3. 文本编辑与美术排版工具 -->
+            <div class="border-t border-slate-100 pt-4 space-y-3">
+                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">卡牌信息编辑</label>
+                
+                <!-- 基础字体选择 -->
+                <div>
+                    <label class="block text-xs text-slate-500 mb-1">主字体选择</label>
+                    <select id="fontFamilySelect" class="w-full p-2 border border-slate-200 rounded text-xs bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none">
+                        <option value="'Noto Sans SC', sans-serif">思源黑体 (标准)</option>
+                        <option value="'Noto Serif SC', serif">思源宋体 (古典)</option>
+                        <option value="'Ma Shan Zheng', cursive">毛笔行楷 (古风)</option>
+                        <option value="'ZCOOL QingKe HuangYou', sans-serif">黄油体 (现代艺术)</option>
+                        <option value="system-ui, sans-serif">系统默认字体</option>
+                    </select>
+                </div>
+
+                <!-- 格式化美术工具栏 -->
+                <div class="flex items-center space-x-1.5 bg-slate-50 p-1.5 rounded border border-slate-150">
+                    <button onclick="insertStyleTag('[b]', '[/b]')" class="px-2 py-1 bg-white hover:bg-slate-150 border border-slate-200 rounded text-xs font-bold" title="加粗">B</button>
+                    <button onclick="insertStyleTag('[u]', '[/u]')" class="px-2 py-1 bg-white hover:bg-slate-150 border border-slate-200 rounded text-xs underline" title="下划线">U</button>
+                    <button onclick="insertStyleTag('[hl]', '[/hl]')" class="px-2 py-1 bg-white hover:bg-slate-150 border border-slate-200 rounded text-xs bg-yellow-100" title="高亮背景">Highlight</button>
+                    
+                    <div class="h-4 w-px bg-slate-300 mx-1"></div>
+                    
+                    <!-- 分段变色按钮 -->
+                    <button onclick="triggerSegmentColor()" class="px-2 py-1 bg-white hover:bg-slate-150 border border-slate-200 rounded text-xs text-red-500 font-semibold" title="分段文本变色">Color</button>
+                    <input type="color" id="segmentColorPicker" value="#ef4444" class="w-6 h-6 border-0 p-0 cursor-pointer rounded-full hidden" />
+                    
+                    <div class="flex-1"></div>
+                    <button onclick="clearTags()" class="text-[10px] text-slate-400 hover:text-red-500 font-medium">清除格式</button>
+                </div>
+
+                <!-- 文本编辑区 -->
+                <textarea id="cardText" rows="4" class="w-full p-2.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all placeholder:text-slate-300 font-sans" placeholder="支持上方美术格式化工具。例如：选中部分文本点击 Color 即可分段变色。"></textarea>
+                
+                <div class="flex items-center space-x-4">
+                    <div class="flex-1">
+                        <label class="flex justify-between text-xs text-slate-500 mb-1">
+                            <span>全局基础字号</span>
+                            <span id="fontSizeVal" class="font-mono">32px</span>
+                        </label>
+                        <input type="range" id="fontSizeRange" min="16" max="80" step="1" value="32" class="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-500 mb-1">全局基础颜色</label>
+                        <input type="color" id="textColor" value="#2d3748" class="w-12 h-8 border border-slate-200 rounded cursor-pointer p-0.5 bg-white">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. 选区调整 (折叠隐藏) -->
+            <div class="border-t border-slate-100 pt-4">
+                <details class="group">
+                    <summary class="flex justify-between items-center text-xs font-semibold text-slate-400 cursor-pointer select-none">
+                        <span>版面自定义</span>
+                        <span class="transition-transform group-open:rotate-180 text-slate-400">▼</span>
+                    </summary>
+                    <div class="mt-3 space-y-3 pt-1">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-slate-600">手动重划文本区域：</span>
+                            <button id="toggleSelectorBtn" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-semibold transition-colors">开启选择</button>
+                        </div>
+                        <textarea id="coordOutput" readonly class="w-full p-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-mono text-slate-500" rows="3" placeholder="此处显示实时坐标数据"></textarea>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <!-- 5. 导出 -->
+        <div class="border-t border-slate-100 pt-4 mt-6">
+            <button id="exportBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium text-sm rounded shadow-md transition-colors">
+                生成卡牌图片
+            </button>
+        </div>
+    </div>
+
+    <!-- 右侧卡牌预览区 -->
+    <div class="flex-1 flex items-center justify-center p-6 overflow-auto">
+        
+        <!-- 预览外部物理限制容器 (410px * 614px) -->
+        <div class="relative bg-slate-100 shadow-2xl rounded-lg overflow-hidden flex items-center justify-center border border-slate-200" style="width: 410px; height: 614px; min-width: 410px; min-height: 614px;">
+            
+            <!-- 1024x1536 核心画布 -->
+            <div id="cardContainer" class="absolute overflow-hidden origin-top-left" style="width: 1024px; height: 1536px; transform: scale(0.4); left: 0; top: 0;">
+                
+                <!-- 图层 1: 卡面图片容器（全面拦截手势事件） -->
+                <div id="artWrapper" class="absolute inset-0 cursor-grab active:cursor-grabbing select-none touch-none" style="z-index: 1;">
+                    <img id="artImg" src="" class="absolute origin-center pointer-events-none select-none" style="transform: translate(0px, 0px) scale(1); max-width: none;" alt="" />
+                </div>
+
+                <!-- 图层 2: 卡框图片 -->
+                <img id="frameImg" src="卡框.png" class="absolute inset-0 w-full h-full select-none pointer-events-none" style="z-index: 10;" alt="未检测到本地卡框" />
+
+                <!-- 图层 3: 文字信息区域 (采用最新确定的坐标范围) -->
+                <div id="textRegion" class="absolute break-words overflow-hidden" style="z-index: 20; left: 80px; top: 1038px; width: 852px; height: 413px; color: #2d3748; font-size: 32px; line-height: 1.5; font-family: 'Noto Sans SC', sans-serif; word-wrap: break-word; white-space: pre-wrap;">这里是[b]加粗效果[/b]、[u]下划线效果[/u]以及[hl]高亮文本背景[/hl]的演示。您还可以随时[c=#ef4444]插入任意分段文字颜色[/c]。</div>
+
+                <!-- 图层 4: 区域选择交互遮罩层 -->
+                <div id="selectionOverlay" class="absolute inset-0 bg-black/40 hidden cursor-crosshair touch-none" style="z-index: 30;">
+                    <div id="selectionBox" class="absolute border-2 border-dashed border-red-500 bg-red-500/10 hidden pointer-events-none">
+                        <span class="absolute -top-6 left-0 bg-red-500 text-white text-[10px] px-1 py-0.5 rounded font-sans">新文本区域</span>
+                        <button id="selectionConfirmBtn" class="absolute -bottom-12 right-0 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded shadow-lg pointer-events-auto cursor-pointer">
+                            确认区域
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // 核心元素获取
+        const frameInput = document.getElementById('frameInput');
+        const artInput = document.getElementById('artInput');
+        
+        const cardText = document.getElementById('cardText');
+        const fontSizeRange = document.getElementById('fontSizeRange');
+        const fontSizeVal = document.getElementById('fontSizeVal');
+        const textColor = document.getElementById('textColor');
+        const fontFamilySelect = document.getElementById('fontFamilySelect');
+        const segmentColorPicker = document.getElementById('segmentColorPicker');
+
+        const toggleSelectorBtn = document.getElementById('toggleSelectorBtn');
+        const coordOutput = document.getElementById('coordOutput');
+        const exportBtn = document.getElementById('exportBtn');
+
+        const cardContainer = document.getElementById('cardContainer');
+        const frameImg = document.getElementById('frameImg');
+        const artImg = document.getElementById('artImg');
+        const artWrapper = document.getElementById('artWrapper');
+        const textRegion = document.getElementById('textRegion');
+        const selectionOverlay = document.getElementById('selectionOverlay');
+        const selectionBox = document.getElementById('selectionBox');
+        const selectionConfirmBtn = document.getElementById('selectionConfirmBtn');
+
+        // 固定物理缩放参数
+        const PREVIEW_SCALE = 0.4;
+
+        // 卡面位置及缩放状态
+        let artState = {
+            x: 0,
+            y: 0,
+            scale: 1,
+            isDragging: false,
+            startX: 0,
+            startY: 0
+        };
+
+        // 双指触摸缩放追踪数据
+        let activePointers = {};
+        let initialDistance = 0;
+        let initialScale = 1;
+
+        // 1. 卡框自选手动更换
+        frameInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                frameImg.src = url;
+            }
+        });
+
+        // 2. 卡面导入
+        artInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                artImg.src = url;
+                artState.x = 0;
+                artState.y = 0;
+                artState.scale = 1;
+                updateArtTransform();
+            }
+        });
+
+        function updateArtTransform() {
+            artImg.style.transform = `translate(${artState.x}px, ${artState.y}px) scale(${artState.scale})`;
+        }
+
+        // 辅助计算：多点触控距离
+        function getDistance(p1, p2) {
+            const dx = p1.clientX - p2.clientX;
+            const dy = p1.clientY - p2.clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        // 3. 卡面手势逻辑（包含鼠标滚轮、拖拽以及移动端双指捏合缩放）
+        artWrapper.addEventListener('pointerdown', (e) => {
+            if (isSelectionMode) return;
+            if (!artImg.src) return;
+            
+            activePointers[e.pointerId] = e;
+            const pointers = Object.values(activePointers);
+
+            if (pointers.length === 1) {
+                // 单点拖动开始
+                artState.isDragging = true;
+                artWrapper.setPointerCapture(e.pointerId);
+                artState.startX = (e.clientX / PREVIEW_SCALE) - artState.x;
+                artState.startY = (e.clientY / PREVIEW_SCALE) - artState.y;
+            } else if (pointers.length === 2) {
+                // 双指捏合开始
+                artState.isDragging = false; 
+                initialDistance = getDistance(pointers[0], pointers[1]);
+                initialScale = artState.scale;
+            }
+        });
+
+        artWrapper.addEventListener('pointermove', (e) => {
+            activePointers[e.pointerId] = e;
+            const pointers = Object.values(activePointers);
+
+            if (pointers.length === 1 && artState.isDragging) {
+                // 拖拽位移中
+                artState.x = (e.clientX / PREVIEW_SCALE) - artState.startX;
+                artState.y = (e.clientY / PREVIEW_SCALE) - artState.startY;
+                updateArtTransform();
+            } else if (pointers.length === 2 && initialDistance > 0) {
+                // 双指缩放中
+                const currentDistance = getDistance(pointers[0], pointers[1]);
+                const scaleFactor = currentDistance / initialDistance;
+                artState.scale = Math.max(0.1, Math.min(5, initialScale * scaleFactor));
+                updateArtTransform();
+            }
+        });
+
+        const handlePointerUp = (e) => {
+            delete activePointers[e.pointerId];
+            if (Object.values(activePointers).length < 2) {
+                initialDistance = 0;
+            }
+            if (artState.isDragging) {
+                artState.isDragging = false;
+                try { artWrapper.releasePointerCapture(e.pointerId); } catch(err) {}
+            }
+        };
+
+        artWrapper.addEventListener('pointerup', handlePointerUp);
+        artWrapper.addEventListener('pointercancel', handlePointerUp);
+
+        // 电脑端：鼠标滚轮缩放
+        artWrapper.addEventListener('wheel', (e) => {
+            if (!artImg.src || isSelectionMode) return;
+            e.preventDefault();
+            const step = 0.05;
+            if (e.deltaY < 0) {
+                artState.scale = Math.min(5, artState.scale + step);
+            } else {
+                artState.scale = Math.max(0.1, artState.scale - step);
+            }
+            updateArtTransform();
+        }, { passive: false });
+
+
+        // 4. 富文本解析算法
+        function parseCardMarkup(text) {
+            // 安全 HTML 转义，防止由于标签渲染冲突导致结构破裂
+            let safeText = text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+
+            // 1. [b] -> 加粗
+            safeText = safeText.replace(/\[b\](.*?)\[\/b\]/g, '<span class="font-bold">$1</span>');
+            
+            // 2. [u] -> 下划线
+            safeText = safeText.replace(/\[u\](.*?)\[\/u\]/g, '<span style="text-decoration: underline;">$1</span>');
+
+            // 3. [hl] -> 段落背景高亮
+            safeText = safeText.replace(/\[hl\](.*?)\[\/hl\]/g, '<span style="background-color: #fef08a; color: #1e293b; padding: 2px 6px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">$1</span>');
+
+            // 4. [c=#HEX] -> 自由指定分段变色
+            safeText = safeText.replace(/\[c=(#[0-9a-fA-F]{6})\](.*?)\[\/c\]/g, '<span style="color: $1;">$2</span>');
+
+            return safeText;
+        }
+
+        // 统一文字渲染和样式更新逻辑
+        function renderText() {
+            const rawContent = cardText.value || '（在此输入卡牌文字信息）';
+            textRegion.innerHTML = parseCardMarkup(rawContent);
+        }
+
+        // 文字内容监听
+        cardText.addEventListener('input', renderText);
+
+        // 字体样式切换监听
+        fontFamilySelect.addEventListener('change', (e) => {
+            textRegion.style.fontFamily = e.target.value;
+        });
+
+        fontSizeRange.addEventListener('input', (e) => {
+            const size = e.target.value;
+            fontSizeVal.innerText = `${size}px`;
+            textRegion.style.fontSize = `${size}px`;
+        });
+
+        textColor.addEventListener('input', (e) => {
+            textRegion.style.color = e.target.value;
+        });
+
+
+        // 5. 富文本格式化标签插入辅助函数
+        function insertStyleTag(openTag, closeTag) {
+            const start = cardText.selectionStart;
+            const end = cardText.selectionEnd;
+            const fullText = cardText.value;
+            const selectedText = fullText.substring(start, end);
+
+            const modifiedText = openTag + selectedText + closeTag;
+            cardText.value = fullText.substring(0, start) + modifiedText + fullText.substring(end);
+
+            // 触发 input 重绘，并归还光标
+            renderText();
+            cardText.focus();
+            cardText.setSelectionRange(start + openTag.length, start + openTag.length + selectedText.length);
+        }
+
+        // 单独处理颜色选取与标签组合插入
+        function triggerSegmentColor() {
+            segmentColorPicker.click();
+        }
+
+        segmentColorPicker.addEventListener('input', (e) => {
+            const selectedColor = e.target.value;
+            insertStyleTag(`[c=${selectedColor}]`, '[/c]');
+        });
+
+        // 格式一键清空
+        function clearTags() {
+            let cleared = cardText.value;
+            cleared = cleared.replace(/\[b\]/g, '').replace(/\[\/b\]/g, '');
+            cleared = cleared.replace(/\[u\]/g, '').replace(/\[\/u\]/g, '');
+            cleared = cleared.replace(/\[hl\]/g, '').replace(/\[\/hl\]/g, '');
+            cleared = cleared.replace(/\[c=#[0-9a-fA-F]{6}\]/g, '').replace(/\[\/c\]/g, '');
+            cardText.value = cleared;
+            renderText();
+        }
+
+
+        // 6. 文本区域手动重划工具逻辑
+        let isSelectionMode = false;
+        let selectionState = {
+            isDrawing: false,
+            startX: 0,
+            startY: 0
+        };
+
+        function enterSelectionMode() {
+            isSelectionMode = true;
+            toggleSelectorBtn.innerText = '关闭选择';
+            toggleSelectorBtn.classList.remove('bg-slate-100');
+            toggleSelectorBtn.classList.add('bg-red-500', 'text-white');
+            selectionOverlay.classList.remove('hidden');
+        }
+
+        function exitSelectionMode() {
+            isSelectionMode = false;
+            toggleSelectorBtn.innerText = '开启选择';
+            toggleSelectorBtn.classList.remove('bg-red-500', 'text-white');
+            toggleSelectorBtn.classList.add('bg-slate-100');
+            selectionOverlay.classList.add('hidden');
+            selectionBox.classList.add('hidden');
+        }
+
+        toggleSelectorBtn.addEventListener('click', () => {
+            if (isSelectionMode) {
+                exitSelectionMode();
+            } else {
+                enterSelectionMode();
+            }
+        });
+
+        selectionOverlay.addEventListener('pointerdown', (e) => {
+            if (!isSelectionMode) return;
+            if (e.target === selectionConfirmBtn || selectionConfirmBtn.contains(e.target)) return;
+
+            selectionState.isDrawing = true;
+            selectionOverlay.setPointerCapture(e.pointerId);
+
+            const rect = cardContainer.getBoundingClientRect();
+            selectionState.startX = (e.clientX - rect.left) / PREVIEW_SCALE;
+            selectionState.startY = (e.clientY - rect.top) / PREVIEW_SCALE;
+
+            selectionBox.style.left = `${selectionState.startX}px`;
+            selectionBox.style.top = `${selectionState.startY}px`;
+            selectionBox.style.width = '0px';
+            selectionBox.style.height = '0px';
+            selectionBox.classList.remove('hidden');
+        });
+
+        selectionOverlay.addEventListener('pointermove', (e) => {
+            if (!selectionState.isDrawing) return;
+
+            const rect = cardContainer.getBoundingClientRect();
+            const currentX = (e.clientX - rect.left) / PREVIEW_SCALE;
+            const currentY = (e.clientY - rect.top) / PREVIEW_SCALE;
+
+            const targetX = Math.max(0, Math.min(1024, currentX));
+            const targetY = Math.max(0, Math.min(1536, currentY));
+
+            const left = Math.min(selectionState.startX, targetX);
+            const top = Math.min(selectionState.startY, targetY);
+            const width = Math.abs(selectionState.startX - targetX);
+            const height = Math.abs(selectionState.startY - targetY);
+
+            selectionBox.style.left = `${left}px`;
+            selectionBox.style.top = `${top}px`;
+            selectionBox.style.width = `${width}px`;
+            selectionBox.style.height = `${height}px`;
+        });
+
+        selectionOverlay.addEventListener('pointerup', (e) => {
+            if (!selectionState.isDrawing) return;
+            selectionState.isDrawing = false;
+            try { selectionOverlay.releasePointerCapture(e.pointerId); } catch(err) {}
+        });
+
+        selectionConfirmBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            const left = parseInt(selectionBox.style.left);
+            const top = parseInt(selectionBox.style.top);
+            const width = parseInt(selectionBox.style.width);
+            const height = parseInt(selectionBox.style.height);
+
+            if (width > 10 && height > 10) {
+                textRegion.style.left = `${left}px`;
+                textRegion.style.top = `${top}px`;
+                textRegion.style.width = `${width}px`;
+                textRegion.style.height = `${height}px`;
+
+                const configStr = `{\n  "left": ${left},\n  "top": ${top},\n  "width": ${width},\n  "height": ${height}\n}`;
+                coordOutput.value = configStr;
+
+                exitSelectionMode();
+            }
+        });
+
+
+        // 7. 导出生成 1024×1536 高级画质卡牌 (html2canvas 深度解析 spans)
+        exportBtn.addEventListener('click', () => {
+            const isSelectorWasOpen = isSelectionMode;
+            if (isSelectorWasOpen) {
+                selectionOverlay.classList.add('hidden');
+            }
+
+            exportBtn.innerText = '正在生成高清晰度图像...';
+            exportBtn.disabled = true;
+
+            // 临时重置 CSS Transform 比例，确保排版完美 100% 物理真实尺寸渲染
+            cardContainer.style.transform = 'none';
+
+            html2canvas(cardContainer, {
+                width: 1024,
+                height: 1536,
+                scale: 1, 
+                useCORS: true,
+                backgroundColor: null,
+                logging: false
+            }).then(canvas => {
+                // 还原预览区的 0.4 缩放比例
+                cardContainer.style.transform = 'scale(0.4)';
+
+                const link = document.createElement('a');
+                link.download = 'card_export.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+                if (isSelectorWasOpen) {
+                    selectionOverlay.classList.remove('hidden');
+                }
+                exportBtn.innerText = '生成卡牌图片';
+                exportBtn.disabled = false;
+            }).catch(err => {
+                console.error("生成失败:", err);
+                cardContainer.style.transform = 'scale(0.4)';
+                alert("生成图像失败，请检查本地素材路径及格式。");
+                exportBtn.innerText = '生成卡牌图片';
+                exportBtn.disabled = false;
+            });
+        });
+
+        // 页面首次初始化渲染
+        window.addEventListener('DOMContentLoaded', () => {
+            renderText();
+        });
+    </script>
+</body>
+</html>
