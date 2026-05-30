@@ -259,15 +259,18 @@
         let savedSelection = { start: 0, end: 0 };
 
         function updateSavedSelection() {
-            savedSelection.start = cardText.selectionStart;
-            savedSelection.end = cardText.selectionEnd;
+            // 限制仅在输入框处于活跃状态，且由用户物理操作时记录，规避程序主动 focus() 带来的回调干扰
+            if (document.activeElement === cardText) {
+                savedSelection.start = cardText.selectionStart;
+                savedSelection.end = cardText.selectionEnd;
+            }
         }
 
-        // 监听所有可能更新选区范围的键盘与鼠标动作
+        // 仅监听用户的物理鼠标、键盘及手势事件，移除了导致选区被重置的 'focus' 和 'input' 监听
         cardText.addEventListener('keyup', updateSavedSelection);
         cardText.addEventListener('mouseup', updateSavedSelection);
-        cardText.addEventListener('focus', updateSavedSelection);
-        cardText.addEventListener('input', updateSavedSelection);
+        cardText.addEventListener('touchend', updateSavedSelection);
+        cardText.addEventListener('select', updateSavedSelection);
 
         // 1. 卡框切换控制 (防缓存安全模式)
         function setFrame(src, btnElement) {
@@ -452,10 +455,12 @@
                 tabPreview.className = "px-3 py-1 font-semibold text-slate-400 hover:text-slate-600 border-b-2 border-transparent";
                 cardText.classList.remove('hidden');
                 cardTextPreview.classList.add('hidden');
-                cardText.focus();
                 
-                // 恢复焦点时，重新校准选区高亮
-                cardText.setSelectionRange(savedSelection.start, savedSelection.end);
+                // 延迟聚焦，防止浏览器重置滚动条
+                setTimeout(() => {
+                    cardText.focus();
+                    cardText.setSelectionRange(savedSelection.start, savedSelection.end);
+                }, 10);
             } else {
                 tabEdit.className = "px-3 py-1 font-semibold text-slate-400 hover:text-slate-600 border-b-2 border-transparent";
                 tabPreview.className = "px-3 py-1 font-semibold border-b-2 border-blue-600 text-blue-600";
@@ -485,7 +490,7 @@
         });
 
 
-        // 5. 富文本标签高级包裹算法 (从全局记录值中提取选区，无视焦点丢失)
+        // 5. 富文本标签高级包裹算法 (彻底隔离 focus 带来的选区损毁)
         function insertStyleTag(openTag, closeTag) {
             // 如果用户当前在“样式预览”选项卡下操作工具，自动先切回“代码编辑”以确保渲染流程完整
             if (!cardTextPreview.classList.contains('hidden')) {
@@ -508,7 +513,7 @@
             const newEnd = newStart + selectedText.length;
             cardText.setSelectionRange(newStart, newEnd);
             
-            // 更新全局记录，准备下一次连续叠加
+            // 核心修复点：在此处主动重写选区数据，确保在不监听 input/focus 干扰的情况下，记录最精确的新选区范围
             savedSelection.start = newStart;
             savedSelection.end = newEnd;
         }
@@ -552,7 +557,7 @@
             cardText.value = cleared;
             renderText();
             
-            // 重置选区为最前端
+            // 重置选区
             savedSelection.start = 0;
             savedSelection.end = 0;
             cardText.focus();
