@@ -38,11 +38,11 @@
             <div class="border-t border-slate-100 pt-4 space-y-2">
                 <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">卡框选择</label>
                 
-                <!-- 预设卡框快捷网格 -->
+                <!-- 预设图床卡框切换 -->
                 <div class="grid grid-cols-4 gap-2">
-                    <button onclick="setFrame('卡框.png', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-blue-600 text-xs font-semibold rounded text-slate-700 transition-all">灰色</button>
-                    <button onclick="setFrame(Image_670596257278124.png', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-transparent text-xs font-semibold rounded text-slate-700 transition-all">蓝色</button>
-                    <button onclick="setFrame('Image_671302598020397.png', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-transparent text-xs font-semibold rounded text-slate-700 transition-all">金色</button>
+                    <button onclick="setFrame('https://i.ibb.co/WWm2gqWf/Image-670596257278124.png', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-transparent text-xs font-semibold rounded text-slate-700 transition-all">蓝色</button>
+                    <button onclick="setFrame('https://i.ibb.co/rfRb3VDx/Image-671302598020397.png', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-transparent text-xs font-semibold rounded text-slate-700 transition-all">金色</button>
+                    <button onclick="setFrame('https://i.ibb.co/d0FhfDRc/image.png', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-blue-600 text-xs font-semibold rounded text-slate-700 transition-all">灰色</button>
                     <button onclick="document.getElementById('frameInput').click()" class="py-2 px-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold rounded text-slate-500 transition-all overflow-hidden text-ellipsis whitespace-nowrap">自定义</button>
                 </div>
                 
@@ -178,8 +178,8 @@
                     <img id="artImg" src="" class="absolute origin-center pointer-events-none select-none" style="transform: translate(0px, 0px) scale(1); max-width: none;" alt="" />
                 </div>
 
-                <!-- 图层 2: 卡框图片 -->
-                <img id="frameImg" src="卡框.png" class="absolute inset-0 w-full h-full select-none pointer-events-none" style="z-index: 10;" alt="未检测到本地卡框" />
+                <!-- 图层 2: 卡框图片 (引入 crossorigin 并默认指向灰色图层) -->
+                <img id="frameImg" crossorigin="anonymous" src="https://i.ibb.co/d0FhfDRc/image.png" class="absolute inset-0 w-full h-full select-none pointer-events-none" style="z-index: 10;" alt="卡框加载中..." />
 
                 <!-- 图层 3: 文字信息区域 (采用最新确定的坐标范围) -->
                 <div id="textRegion" class="absolute break-words overflow-hidden" style="z-index: 20; left: 80px; top: 1038px; width: 852px; height: 413px; color: #2d3748; font-size: 32px; line-height: 1.5; font-family: 'Noto Sans SC', sans-serif; word-wrap: break-word; white-space: pre-wrap;">这里是[b]加粗效果[/b]、[u]下划线效果[/u]以及[hl]高亮文本背景[/hl]的演示。您还可以随时[c=#ef4444]插入任意分段文字颜色[/c]。也可以使用特定[size=52]局部字号大小放大[/size]或切换[font=Ma Shan Zheng]局部字体款式[/font]。</div>
@@ -246,9 +246,16 @@
         let initialDistance = 0;
         let initialScale = 1;
 
-        // 1. 卡框切换控制
+        // 1. 卡框切换控制 (添加跨域安全及时间戳逻辑)
         function setFrame(src, btnElement) {
-            frameImg.src = src;
+            // 每次切换时强制显式声明跨域匿名模式
+            frameImg.removeAttribute('crossorigin');
+            frameImg.setAttribute('crossorigin', 'anonymous');
+            
+            // 附加动态时间戳防止浏览器强行读取无CORS头的缓存文件
+            const cacheBuster = src + "?t=" + new Date().getTime();
+            frameImg.src = cacheBuster;
+
             document.querySelectorAll('.frame-btn').forEach(btn => {
                 btn.classList.remove('border-blue-600');
                 btn.classList.add('border-transparent');
@@ -263,6 +270,7 @@
             const file = e.target.files[0];
             if (file) {
                 const url = URL.createObjectURL(file);
+                frameImg.removeAttribute('crossorigin'); // 本地图片无需声明跨域
                 frameImg.src = url;
                 // 取消默认卡框高亮
                 document.querySelectorAll('.frame-btn').forEach(btn => {
@@ -309,7 +317,7 @@
             return Math.sqrt(dx * dx + dy * dy);
         }
 
-        // 3. 卡面手势逻辑（支持锁定判定）
+        // 3. 卡面手势逻辑
         artWrapper.addEventListener('pointerdown', (e) => {
             if (isSelectionMode || lockArtCheckbox.checked) return;
             if (!artImg.src) return;
@@ -374,7 +382,7 @@
         }, { passive: false });
 
 
-        // 4. 富文本解析算法（升级增加局部字号和局部字体款式）
+        // 4. 富文本解析算法
         function parseCardMarkup(text) {
             let safeText = text
                 .replace(/&/g, "&amp;")
@@ -580,7 +588,7 @@
         });
 
 
-        // 7. 导出生成 1024×1536 标准高分辨率卡牌
+        // 7. 导出生成 1024×1536 标准高分辨率卡牌 (html2canvas CORS 配置模式)
         exportBtn.addEventListener('click', () => {
             const isSelectorWasOpen = isSelectionMode;
             if (isSelectorWasOpen) {
@@ -597,7 +605,8 @@
                 width: 1024,
                 height: 1536,
                 scale: 1, 
-                useCORS: true,
+                useCORS: true,       // 允许读取外域跨域资源
+                allowTaint: false,   // 禁止污染画布保证 dataURL 能成功导出
                 backgroundColor: null,
                 logging: false
             }).then(canvas => {
@@ -616,7 +625,7 @@
             }).catch(err => {
                 console.error("生成失败:", err);
                 cardContainer.style.transform = 'scale(0.4)';
-                alert("生成图像失败，请检查本地素材路径及格式。");
+                alert("生成图像失败，请检查素材跨域及加载情况。");
                 exportBtn.innerText = '生成卡牌图片';
                 exportBtn.disabled = false;
             });
