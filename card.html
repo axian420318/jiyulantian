@@ -35,23 +35,37 @@
             </div>
 
             <!-- 1. 卡框管理 -->
-            <div class="border-t border-slate-100 pt-4">
-                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">卡框设置</label>
-                <div class="flex items-center space-x-2">
-                    <input type="file" id="frameInput" accept="image/*" class="hidden" />
-                    <button onclick="document.getElementById('frameInput').click()" class="w-full py-2 px-3 border border-dashed border-slate-300 hover:border-blue-500 rounded text-xs font-medium text-slate-600 hover:text-blue-600 transition-colors bg-slate-50">
-                        更换卡框图片 (1024×1536)
-                    </button>
+            <div class="border-t border-slate-100 pt-4 space-y-2">
+                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">卡框选择</label>
+                
+                <!-- 预设卡框快捷网格 -->
+                <div class="grid grid-cols-4 gap-2">
+                    <button onclick="setFrame('卡框.png', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-blue-600 text-xs font-semibold rounded text-slate-700 transition-all">灰色</button>
+                    <button onclick="setFrame('蓝卡框.png', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-transparent text-xs font-semibold rounded text-slate-700 transition-all">蓝色</button>
+                    <button onclick="setFrame('金卡框.png', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-transparent text-xs font-semibold rounded text-slate-700 transition-all">金色</button>
+                    <button onclick="document.getElementById('frameInput').click()" class="py-2 px-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold rounded text-slate-500 transition-all overflow-hidden text-ellipsis whitespace-nowrap">自定义</button>
                 </div>
+                
+                <input type="file" id="frameInput" accept="image/*" class="hidden" />
             </div>
 
             <!-- 2. 卡面管理 -->
             <div class="border-t border-slate-100 pt-4 space-y-3">
-                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">卡面设置</label>
+                <div class="flex items-center justify-between">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">卡面设置</label>
+                    
+                    <!-- 卡面锁定状态开关 -->
+                    <label class="inline-flex items-center cursor-pointer select-none">
+                        <input type="checkbox" id="lockArtCheckbox" class="sr-only peer">
+                        <div class="relative w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        <span class="ms-1.5 text-[11px] font-semibold text-slate-500" id="lockText">未锁定</span>
+                    </label>
+                </div>
+                
                 <input type="file" id="artInput" accept="image/*" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-slate-200 file:text-xs file:font-medium file:bg-slate-50 hover:file:bg-slate-100 file:text-slate-700 cursor-pointer" />
                 <div class="bg-slate-50 p-2.5 rounded text-[11px] text-slate-500 space-y-1">
                     <p class="font-medium text-slate-700">操作说明：</p>
-                    <p>•单指拖拽平移，双指捏合缩放</p>
+                    <p>• 开启锁定后可避免在划区或打字时误碰图片</p>
                 </div>
             </div>
 
@@ -59,9 +73,9 @@
             <div class="border-t border-slate-100 pt-4 space-y-3">
                 <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">卡牌信息编辑</label>
                 
-                <!-- 基础字体选择 -->
+                <!-- 基础全局主字体选择 -->
                 <div>
-                    <label class="block text-xs text-slate-500 mb-1">主字体选择</label>
+                    <label class="block text-[11px] text-slate-400 mb-1">全局基础字体样式</label>
                     <select id="fontFamilySelect" class="w-full p-2 border border-slate-200 rounded text-xs bg-white focus:ring-1 focus:ring-blue-500 focus:outline-none">
                         <option value="'Noto Sans SC', sans-serif">思源黑体 (标准)</option>
                         <option value="'Noto Serif SC', serif">思源宋体 (古典)</option>
@@ -72,23 +86,42 @@
                 </div>
 
                 <!-- 格式化美术工具栏 -->
-                <div class="flex items-center space-x-1.5 bg-slate-50 p-1.5 rounded border border-slate-150">
-                    <button onclick="insertStyleTag('[b]', '[/b]')" class="px-2 py-1 bg-white hover:bg-slate-150 border border-slate-200 rounded text-xs font-bold" title="加粗">B</button>
-                    <button onclick="insertStyleTag('[u]', '[/u]')" class="px-2 py-1 bg-white hover:bg-slate-150 border border-slate-200 rounded text-xs underline" title="下划线">U</button>
-                    <button onclick="insertStyleTag('[hl]', '[/hl]')" class="px-2 py-1 bg-white hover:bg-slate-150 border border-slate-200 rounded text-xs bg-yellow-100" title="高亮背景">Highlight</button>
-                    
-                    <div class="h-4 w-px bg-slate-300 mx-1"></div>
-                    
-                    <!-- 分段变色按钮 -->
-                    <button onclick="triggerSegmentColor()" class="px-2 py-1 bg-white hover:bg-slate-150 border border-slate-200 rounded text-xs text-red-500 font-semibold" title="分段文本变色">Color</button>
+                <div class="flex flex-wrap items-center gap-1.5 bg-slate-50 p-2 rounded border border-slate-150">
+                    <!-- 基本样式 -->
+                    <button onclick="insertStyleTag('[b]', '[/b]')" class="h-7 px-2 bg-white hover:bg-slate-100 border border-slate-200 rounded text-xs font-bold" title="加粗">B</button>
+                    <button onclick="insertStyleTag('[u]', '[/u]')" class="h-7 px-2 bg-white hover:bg-slate-100 border border-slate-200 rounded text-xs underline" title="下划线">U</button>
+                    <button onclick="insertStyleTag('[hl]', '[/hl]')" class="h-7 px-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded text-xs bg-yellow-50" title="荧光高亮">高亮</button>
+                    <button onclick="triggerSegmentColor()" class="h-7 px-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded text-xs text-red-500 font-semibold" title="局部变色">颜色</button>
                     <input type="color" id="segmentColorPicker" value="#ef4444" class="w-6 h-6 border-0 p-0 cursor-pointer rounded-full hidden" />
                     
-                    <div class="flex-1"></div>
-                    <button onclick="clearTags()" class="text-[10px] text-slate-400 hover:text-red-500 font-medium">清除格式</button>
+                    <div class="h-5 w-px bg-slate-300 mx-0.5"></div>
+                    
+                    <!-- 局部字号下拉选择 -->
+                    <select id="localSizeSelector" onchange="applyLocalSize(this)" class="h-7 px-1 border border-slate-200 rounded text-[11px] bg-white focus:outline-none cursor-pointer">
+                        <option value="" disabled selected>字号</option>
+                        <option value="20">20px</option>
+                        <option value="28">28px</option>
+                        <option value="36">36px</option>
+                        <option value="44">44px</option>
+                        <option value="52">52px</option>
+                        <option value="64">64px</option>
+                        <option value="80">80px</option>
+                    </select>
+
+                    <!-- 局部款式下拉选择 -->
+                    <select id="localFontSelector" onchange="applyLocalFont(this)" class="h-7 px-1 border border-slate-200 rounded text-[11px] bg-white focus:outline-none cursor-pointer">
+                        <option value="" disabled selected>款式</option>
+                        <option value="Noto Sans SC">黑体</option>
+                        <option value="Noto Serif SC">宋体</option>
+                        <option value="Ma Shan Zheng">楷体</option>
+                        <option value="ZCOOL QingKe HuangYou">黄油</option>
+                    </select>
+                    
+                    <button onclick="clearTags()" class="ml-auto text-[10px] text-slate-400 hover:text-red-500 font-medium">清空格式</button>
                 </div>
 
                 <!-- 文本编辑区 -->
-                <textarea id="cardText" rows="4" class="w-full p-2.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all placeholder:text-slate-300 font-sans" placeholder="支持上方美术格式化工具。例如：选中部分文本点击 Color 即可分段变色。"></textarea>
+                <textarea id="cardText" rows="4" class="w-full p-2.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all placeholder:text-slate-300 font-sans" placeholder="支持选中文字后，通过上方工具栏赋予个别字体局部变色、加粗、局部字号、及特定局部字体款式等高级效果。"></textarea>
                 
                 <div class="flex items-center space-x-4">
                     <div class="flex-1">
@@ -99,7 +132,7 @@
                         <input type="range" id="fontSizeRange" min="16" max="80" step="1" value="32" class="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
                     </div>
                     <div>
-                        <label class="block text-xs text-slate-500 mb-1">全局基础颜色</label>
+                        <label class="block text-xs text-slate-500 mb-1">全局颜色</label>
                         <input type="color" id="textColor" value="#2d3748" class="w-12 h-8 border border-slate-200 rounded cursor-pointer p-0.5 bg-white">
                     </div>
                 </div>
@@ -149,7 +182,7 @@
                 <img id="frameImg" src="卡框.png" class="absolute inset-0 w-full h-full select-none pointer-events-none" style="z-index: 10;" alt="未检测到本地卡框" />
 
                 <!-- 图层 3: 文字信息区域 (采用最新确定的坐标范围) -->
-                <div id="textRegion" class="absolute break-words overflow-hidden" style="z-index: 20; left: 80px; top: 1038px; width: 852px; height: 413px; color: #2d3748; font-size: 32px; line-height: 1.5; font-family: 'Noto Sans SC', sans-serif; word-wrap: break-word; white-space: pre-wrap;">这里是[b]加粗效果[/b]、[u]下划线效果[/u]以及[hl]高亮文本背景[/hl]的演示。您还可以随时[c=#ef4444]插入任意分段文字颜色[/c]。</div>
+                <div id="textRegion" class="absolute break-words overflow-hidden" style="z-index: 20; left: 80px; top: 1038px; width: 852px; height: 413px; color: #2d3748; font-size: 32px; line-height: 1.5; font-family: 'Noto Sans SC', sans-serif; word-wrap: break-word; white-space: pre-wrap;">这里是[b]加粗效果[/b]、[u]下划线效果[/u]以及[hl]高亮文本背景[/hl]的演示。您还可以随时[c=#ef4444]插入任意分段文字颜色[/c]。也可以使用特定[size=52]局部字号大小放大[/size]或切换[font=Ma Shan Zheng]局部字体款式[/font]。</div>
 
                 <!-- 图层 4: 区域选择交互遮罩层 -->
                 <div id="selectionOverlay" class="absolute inset-0 bg-black/40 hidden cursor-crosshair touch-none" style="z-index: 30;">
@@ -170,6 +203,8 @@
         // 核心元素获取
         const frameInput = document.getElementById('frameInput');
         const artInput = document.getElementById('artInput');
+        const lockArtCheckbox = document.getElementById('lockArtCheckbox');
+        const lockText = document.getElementById('lockText');
         
         const cardText = document.getElementById('cardText');
         const fontSizeRange = document.getElementById('fontSizeRange');
@@ -177,6 +212,8 @@
         const textColor = document.getElementById('textColor');
         const fontFamilySelect = document.getElementById('fontFamilySelect');
         const segmentColorPicker = document.getElementById('segmentColorPicker');
+        const localSizeSelector = document.getElementById('localSizeSelector');
+        const localFontSelector = document.getElementById('localFontSelector');
 
         const toggleSelectorBtn = document.getElementById('toggleSelectorBtn');
         const coordOutput = document.getElementById('coordOutput');
@@ -209,12 +246,29 @@
         let initialDistance = 0;
         let initialScale = 1;
 
-        // 1. 卡框自选手动更换
+        // 1. 卡框切换控制
+        function setFrame(src, btnElement) {
+            frameImg.src = src;
+            document.querySelectorAll('.frame-btn').forEach(btn => {
+                btn.classList.remove('border-blue-600');
+                btn.classList.add('border-transparent');
+            });
+            if (btnElement) {
+                btnElement.classList.remove('border-transparent');
+                btnElement.classList.add('border-blue-600');
+            }
+        }
+
         frameInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
                 const url = URL.createObjectURL(file);
                 frameImg.src = url;
+                // 取消默认卡框高亮
+                document.querySelectorAll('.frame-btn').forEach(btn => {
+                    btn.classList.remove('border-blue-600');
+                    btn.classList.add('border-transparent');
+                });
             }
         });
 
@@ -231,6 +285,19 @@
             }
         });
 
+        // 锁定控制监听
+        lockArtCheckbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                lockText.innerText = "已锁定";
+                lockText.classList.remove('text-slate-500');
+                lockText.classList.add('text-blue-600');
+            } else {
+                lockText.innerText = "未锁定";
+                lockText.classList.remove('text-blue-600');
+                lockText.classList.add('text-slate-500');
+            }
+        });
+
         function updateArtTransform() {
             artImg.style.transform = `translate(${artState.x}px, ${artState.y}px) scale(${artState.scale})`;
         }
@@ -242,22 +309,20 @@
             return Math.sqrt(dx * dx + dy * dy);
         }
 
-        // 3. 卡面手势逻辑（包含鼠标滚轮、拖拽以及移动端双指捏合缩放）
+        // 3. 卡面手势逻辑（支持锁定判定）
         artWrapper.addEventListener('pointerdown', (e) => {
-            if (isSelectionMode) return;
+            if (isSelectionMode || lockArtCheckbox.checked) return;
             if (!artImg.src) return;
             
             activePointers[e.pointerId] = e;
             const pointers = Object.values(activePointers);
 
             if (pointers.length === 1) {
-                // 单点拖动开始
                 artState.isDragging = true;
                 artWrapper.setPointerCapture(e.pointerId);
                 artState.startX = (e.clientX / PREVIEW_SCALE) - artState.x;
                 artState.startY = (e.clientY / PREVIEW_SCALE) - artState.y;
             } else if (pointers.length === 2) {
-                // 双指捏合开始
                 artState.isDragging = false; 
                 initialDistance = getDistance(pointers[0], pointers[1]);
                 initialScale = artState.scale;
@@ -265,16 +330,15 @@
         });
 
         artWrapper.addEventListener('pointermove', (e) => {
+            if (lockArtCheckbox.checked) return;
             activePointers[e.pointerId] = e;
             const pointers = Object.values(activePointers);
 
             if (pointers.length === 1 && artState.isDragging) {
-                // 拖拽位移中
                 artState.x = (e.clientX / PREVIEW_SCALE) - artState.startX;
                 artState.y = (e.clientY / PREVIEW_SCALE) - artState.startY;
                 updateArtTransform();
             } else if (pointers.length === 2 && initialDistance > 0) {
-                // 双指缩放中
                 const currentDistance = getDistance(pointers[0], pointers[1]);
                 const scaleFactor = currentDistance / initialDistance;
                 artState.scale = Math.max(0.1, Math.min(5, initialScale * scaleFactor));
@@ -298,7 +362,7 @@
 
         // 电脑端：鼠标滚轮缩放
         artWrapper.addEventListener('wheel', (e) => {
-            if (!artImg.src || isSelectionMode) return;
+            if (!artImg.src || isSelectionMode || lockArtCheckbox.checked) return;
             e.preventDefault();
             const step = 0.05;
             if (e.deltaY < 0) {
@@ -310,39 +374,42 @@
         }, { passive: false });
 
 
-        // 4. 富文本解析算法
+        // 4. 富文本解析算法（升级增加局部字号和局部字体款式）
         function parseCardMarkup(text) {
-            // 安全 HTML 转义，防止由于标签渲染冲突导致结构破裂
             let safeText = text
                 .replace(/&/g, "&amp;")
                 .replace(/</g, "&lt;")
                 .replace(/>/g, "&gt;");
 
-            // 1. [b] -> 加粗
+            // [b] -> 加粗
             safeText = safeText.replace(/\[b\](.*?)\[\/b\]/g, '<span class="font-bold">$1</span>');
             
-            // 2. [u] -> 下划线
+            // [u] -> 下划线
             safeText = safeText.replace(/\[u\](.*?)\[\/u\]/g, '<span style="text-decoration: underline;">$1</span>');
 
-            // 3. [hl] -> 段落背景高亮
+            // [hl] -> 背景高亮
             safeText = safeText.replace(/\[hl\](.*?)\[\/hl\]/g, '<span style="background-color: #fef08a; color: #1e293b; padding: 2px 6px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">$1</span>');
 
-            // 4. [c=#HEX] -> 自由指定分段变色
+            // [c=#HEX] -> 局部颜色
             safeText = safeText.replace(/\[c=(#[0-9a-fA-F]{6})\](.*?)\[\/c\]/g, '<span style="color: $1;">$2</span>');
+
+            // [size=XX] -> 局部字号
+            safeText = safeText.replace(/\[size=(\d+)\](.*?)\[\/size\]/g, '<span style="font-size: $1px; line-height: 1.1;">$2</span>');
+
+            // [font=XXX] -> 局部字体款式
+            safeText = safeText.replace(/\[font=([^\]]+)\](.*?)\[\/font\]/g, '<span style="font-family: \'$1\';">$2</span>');
 
             return safeText;
         }
 
-        // 统一文字渲染和样式更新逻辑
+        // 渲染文本
         function renderText() {
             const rawContent = cardText.value || '（在此输入卡牌文字信息）';
             textRegion.innerHTML = parseCardMarkup(rawContent);
         }
 
-        // 文字内容监听
         cardText.addEventListener('input', renderText);
 
-        // 字体样式切换监听
         fontFamilySelect.addEventListener('change', (e) => {
             textRegion.style.fontFamily = e.target.value;
         });
@@ -358,7 +425,7 @@
         });
 
 
-        // 5. 富文本格式化标签插入辅助函数
+        // 5. 富文本标签插入及清空
         function insertStyleTag(openTag, closeTag) {
             const start = cardText.selectionStart;
             const end = cardText.selectionEnd;
@@ -368,29 +435,46 @@
             const modifiedText = openTag + selectedText + closeTag;
             cardText.value = fullText.substring(0, start) + modifiedText + fullText.substring(end);
 
-            // 触发 input 重绘，并归还光标
             renderText();
             cardText.focus();
             cardText.setSelectionRange(start + openTag.length, start + openTag.length + selectedText.length);
         }
 
-        // 单独处理颜色选取与标签组合插入
         function triggerSegmentColor() {
             segmentColorPicker.click();
         }
 
         segmentColorPicker.addEventListener('input', (e) => {
-            const selectedColor = e.target.value;
-            insertStyleTag(`[c=${selectedColor}]`, '[/c]');
+            insertStyleTag(`[c=${e.target.value}]`, '[/c]');
         });
 
-        // 格式一键清空
+        // 应用局部字号
+        function applyLocalSize(select) {
+            const sizeValue = select.value;
+            if (sizeValue) {
+                insertStyleTag(`[size=${sizeValue}]`, '[/size]');
+                select.value = ""; // 归位选择器
+            }
+        }
+
+        // 应用局部款式
+        function applyLocalFont(select) {
+            const fontValue = select.value;
+            if (fontValue) {
+                insertStyleTag(`[font=${fontValue}]`, '[/font]');
+                select.value = ""; // 归位选择器
+            }
+        }
+
+        // 清空所有排版格式标签
         function clearTags() {
             let cleared = cardText.value;
             cleared = cleared.replace(/\[b\]/g, '').replace(/\[\/b\]/g, '');
             cleared = cleared.replace(/\[u\]/g, '').replace(/\[\/u\]/g, '');
             cleared = cleared.replace(/\[hl\]/g, '').replace(/\[\/hl\]/g, '');
             cleared = cleared.replace(/\[c=#[0-9a-fA-F]{6}\]/g, '').replace(/\[\/c\]/g, '');
+            cleared = cleared.replace(/\[size=\d+\]/g, '').replace(/\[\/size\]/g, '');
+            cleared = cleared.replace(/\[font=[^\]]+\]/g, '').replace(/\[\/font\]/g, '');
             cardText.value = cleared;
             renderText();
         }
@@ -496,7 +580,7 @@
         });
 
 
-        // 7. 导出生成 1024×1536 高级画质卡牌 (html2canvas 深度解析 spans)
+        // 7. 导出生成 1024×1536 标准高分辨率卡牌
         exportBtn.addEventListener('click', () => {
             const isSelectorWasOpen = isSelectionMode;
             if (isSelectorWasOpen) {
@@ -506,7 +590,7 @@
             exportBtn.innerText = '正在生成高清晰度图像...';
             exportBtn.disabled = true;
 
-            // 临时重置 CSS Transform 比例，确保排版完美 100% 物理真实尺寸渲染
+            // 临时重置 CSS Transform 比例，确保 100% 物理真实尺寸渲染
             cardContainer.style.transform = 'none';
 
             html2canvas(cardContainer, {
@@ -517,7 +601,6 @@
                 backgroundColor: null,
                 logging: false
             }).then(canvas => {
-                // 还原预览区的 0.4 缩放比例
                 cardContainer.style.transform = 'scale(0.4)';
 
                 const link = document.createElement('a');
