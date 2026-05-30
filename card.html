@@ -36,17 +36,17 @@
 
             <!-- 1. 卡框管理 -->
             <div class="border-t border-slate-100 pt-4 space-y-2">
-                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">卡框选择</label>
+                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">卡框选择 (Base64)</label>
                 
                 <!-- 预设卡框快捷网格 -->
                 <div class="grid grid-cols-4 gap-2">
-                    <button onclick="setFrame('卡框.png', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-blue-600 text-xs font-semibold rounded text-slate-700 transition-all">灰色</button>
-                    <button onclick="setFrame('蓝卡框.png', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-transparent text-xs font-semibold rounded text-slate-700 transition-all">蓝色</button>
-                    <button onclick="setFrame('金卡框.png', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-transparent text-xs font-semibold rounded text-slate-700 transition-all">金色</button>
+                    <button onclick="loadFrameFromTxt('灰卡框.txt', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-transparent text-xs font-semibold rounded text-slate-700 transition-all">灰色</button>
+                    <button onclick="loadFrameFromTxt('蓝卡框.txt', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-transparent text-xs font-semibold rounded text-slate-700 transition-all">蓝色</button>
+                    <button onclick="loadFrameFromTxt('金卡框.txt', this)" class="frame-btn py-2 px-1 bg-slate-50 hover:bg-slate-100 border-2 border-transparent text-xs font-semibold rounded text-slate-700 transition-all">金色</button>
                     <button onclick="document.getElementById('frameInput').click()" class="py-2 px-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-semibold rounded text-slate-500 transition-all overflow-hidden text-ellipsis whitespace-nowrap">自定义</button>
                 </div>
-                
-                <input type="file" id="frameInput" accept="image/*" class="hidden" />
+                <!-- 隐藏的输入端：支持 PNG / JPG，也支持直接上传 TXT base64 文件 -->
+                <input type="file" id="frameInput" accept="image/*,.txt" class="hidden" />
             </div>
 
             <!-- 2. 卡面管理 -->
@@ -87,7 +87,6 @@
 
                 <!-- 格式化美术工具栏 -->
                 <div class="flex flex-wrap items-center gap-1.5 bg-slate-50 p-2 rounded border border-slate-150">
-                    <!-- 基本样式 -->
                     <button onclick="insertStyleTag('[b]', '[/b]')" class="h-7 px-2 bg-white hover:bg-slate-100 border border-slate-200 rounded text-xs font-bold" title="加粗">B</button>
                     <button onclick="insertStyleTag('[u]', '[/u]')" class="h-7 px-2 bg-white hover:bg-slate-100 border border-slate-200 rounded text-xs underline" title="下划线">U</button>
                     <button onclick="insertStyleTag('[hl]', '[/hl]')" class="h-7 px-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded text-xs bg-yellow-50" title="荧光高亮">高亮</button>
@@ -121,7 +120,7 @@
                 </div>
 
                 <!-- 文本编辑区 -->
-                <textarea id="cardText" rows="4" class="w-full p-2.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all placeholder:text-slate-300 font-sans" placeholder="支持选中文字后，通过上方工具栏赋予个别字体局部变色、加粗、局部字号、及特定局部字体款式等高级效果。"></textarea>
+                <textarea id="cardText" rows="4" class="w-full p-2.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all placeholder:text-slate-300 font-sans" placeholder="支持选中文字后应用工具栏效果。"></textarea>
                 
                 <div class="flex items-center space-x-4">
                     <div class="flex-1">
@@ -179,9 +178,9 @@
                 </div>
 
                 <!-- 图层 2: 卡框图片 -->
-                <img id="frameImg" src="卡框.png" class="absolute inset-0 w-full h-full select-none pointer-events-none" style="z-index: 10;" alt="未检测到本地卡框" />
+                <img id="frameImg" src="" class="absolute inset-0 w-full h-full select-none pointer-events-none" style="z-index: 10;" alt="卡框加载中..." />
 
-                <!-- 图层 3: 文字信息区域 (采用最新确定的坐标范围) -->
+                <!-- 图层 3: 文字信息区域 (采用固定坐标范围) -->
                 <div id="textRegion" class="absolute break-words overflow-hidden" style="z-index: 20; left: 80px; top: 1038px; width: 852px; height: 413px; color: #2d3748; font-size: 32px; line-height: 1.5; font-family: 'Noto Sans SC', sans-serif; word-wrap: break-word; white-space: pre-wrap;">这里是[b]加粗效果[/b]、[u]下划线效果[/u]以及[hl]高亮文本背景[/hl]的演示。您还可以随时[c=#ef4444]插入任意分段文字颜色[/c]。也可以使用特定[size=52]局部字号大小放大[/size]或切换[font=Ma Shan Zheng]局部字体款式[/font]。</div>
 
                 <!-- 图层 4: 区域选择交互遮罩层 -->
@@ -246,9 +245,20 @@
         let initialDistance = 0;
         let initialScale = 1;
 
-        // 1. 卡框切换控制
-        function setFrame(src, btnElement) {
+        // 预设卡框 Base64 内存缓存
+        const frameCache = {};
+
+        // 统一渲染 Base64 卡框函数
+        function applyBase64Frame(base64Content) {
+            let src = base64Content.trim();
+            if (src && !src.startsWith('data:image')) {
+                src = 'data:image/png;base64,' + src;
+            }
             frameImg.src = src;
+        }
+
+        // 修改按钮高亮 UI
+        function updateFrameButtonUI(btnElement) {
             document.querySelectorAll('.frame-btn').forEach(btn => {
                 btn.classList.remove('border-blue-600');
                 btn.classList.add('border-transparent');
@@ -259,16 +269,49 @@
             }
         }
 
+        // 异步读取本地 Base64 文本
+        function loadFrameFromTxt(filename, btnElement = null) {
+            if (frameCache[filename]) {
+                applyBase64Frame(frameCache[filename]);
+                updateFrameButtonUI(btnElement);
+                return;
+            }
+
+            fetch(filename)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`无法载入本地文件: ${filename}`);
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    frameCache[filename] = text;
+                    applyBase64Frame(text);
+                    updateFrameButtonUI(btnElement);
+                })
+                .catch(err => {
+                    console.warn(`自动读取本地 ${filename} 失败(可能由于浏览器本地安全限制):`, err);
+                    // 弹出友好提示告知用户如何自行上传文本文件
+                    alert(`系统尝试自动读取同目录下的 [ ${filename} ] 失败。\n\n如果您是直接在本地双击运行的 HTML 文件，浏览器会限制该读取行为。\n您可以通过点击右侧的 [自定义] 按钮，直接手动选择并载入您的卡框图片或对应的文本文件。`);
+                });
+        }
+
+        // 兼容性的自定义上传逻辑（支持 PNG/JPG 以及直接上传 TXT base64 文本文件）
         frameInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
-                const url = URL.createObjectURL(file);
-                frameImg.src = url;
-                // 取消默认卡框高亮
-                document.querySelectorAll('.frame-btn').forEach(btn => {
-                    btn.classList.remove('border-blue-600');
-                    btn.classList.add('border-transparent');
-                });
+                if (file.name.endsWith('.txt')) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        applyBase64Frame(event.target.result);
+                        updateFrameButtonUI(null);
+                    };
+                    reader.readAsText(file);
+                } else {
+                    const url = URL.createObjectURL(file);
+                    frameImg.src = url;
+                    updateFrameButtonUI(null);
+                }
             }
         });
 
@@ -360,7 +403,7 @@
         artWrapper.addEventListener('pointerup', handlePointerUp);
         artWrapper.addEventListener('pointercancel', handlePointerUp);
 
-        // 电脑端：鼠标滚轮缩放
+        // 电脑端：滚轮缩放
         artWrapper.addEventListener('wheel', (e) => {
             if (!artImg.src || isSelectionMode || lockArtCheckbox.checked) return;
             e.preventDefault();
@@ -374,7 +417,7 @@
         }, { passive: false });
 
 
-        // 4. 富文本解析算法（升级增加局部字号和局部字体款式）
+        // 4. 富文本解析算法
         function parseCardMarkup(text) {
             let safeText = text
                 .replace(/&/g, "&amp;")
@@ -448,25 +491,22 @@
             insertStyleTag(`[c=${e.target.value}]`, '[/c]');
         });
 
-        // 应用局部字号
         function applyLocalSize(select) {
             const sizeValue = select.value;
             if (sizeValue) {
                 insertStyleTag(`[size=${sizeValue}]`, '[/size]');
-                select.value = ""; // 归位选择器
+                select.value = ""; 
             }
         }
 
-        // 应用局部款式
         function applyLocalFont(select) {
             const fontValue = select.value;
             if (fontValue) {
                 insertStyleTag(`[font=${fontValue}]`, '[/font]');
-                select.value = ""; // 归位选择器
+                select.value = ""; 
             }
         }
 
-        // 清空所有排版格式标签
         function clearTags() {
             let cleared = cardText.value;
             cleared = cleared.replace(/\[b\]/g, '').replace(/\[\/b\]/g, '');
@@ -580,7 +620,7 @@
         });
 
 
-        // 7. 导出生成 1024×1536 标准高分辨率卡牌
+        // 7. 导出生成 1024×1536
         exportBtn.addEventListener('click', () => {
             const isSelectorWasOpen = isSelectionMode;
             if (isSelectorWasOpen) {
@@ -590,7 +630,6 @@
             exportBtn.innerText = '正在生成高清晰度图像...';
             exportBtn.disabled = true;
 
-            // 临时重置 CSS Transform 比例，确保 100% 物理真实尺寸渲染
             cardContainer.style.transform = 'none';
 
             html2canvas(cardContainer, {
@@ -622,9 +661,13 @@
             });
         });
 
-        // 页面首次初始化渲染
+        // 页面首次初始化渲染及默认加载灰卡框 Base64
         window.addEventListener('DOMContentLoaded', () => {
             renderText();
+            
+            // 自动加载默认的灰色卡框，并高亮其对应按钮
+            const defaultBtn = document.querySelector('.frame-btn');
+            loadFrameFromTxt('灰卡框.txt', defaultBtn);
         });
     </script>
 </body>
