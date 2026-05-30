@@ -63,10 +63,6 @@
                 </div>
                 
                 <input type="file" id="artInput" accept="image/*" class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-slate-200 file:text-xs file:font-medium file:bg-slate-50 hover:file:bg-slate-100 file:text-slate-700 cursor-pointer" />
-                <div class="bg-slate-50 p-2.5 rounded text-[11px] text-slate-500 space-y-1">
-                    <p class="font-medium text-slate-700">操作说明：</p>
-                    <p>• 开启锁定后可避免在划区或打字时误碰图片</p>
-                </div>
             </div>
 
             <!-- 3. 文本编辑与美术排版工具 -->
@@ -86,7 +82,7 @@
                 </div>
 
                 <!-- 格式化美术工具栏 -->
-                <div class="flex flex-wrap items-center gap-1.5 bg-slate-50 p-2 rounded border border-slate-150">
+                <div class="flex flex-wrap items-center gap-1.5 bg-slate-50 p-2 rounded-t border-t border-x border-slate-200">
                     <!-- 基本样式 -->
                     <button onclick="insertStyleTag('[b]', '[/b]')" class="h-7 px-2 bg-white hover:bg-slate-100 border border-slate-200 rounded text-xs font-bold" title="加粗">B</button>
                     <button onclick="insertStyleTag('[u]', '[/u]')" class="h-7 px-2 bg-white hover:bg-slate-100 border border-slate-200 rounded text-xs underline" title="下划线">U</button>
@@ -120,8 +116,20 @@
                     <button onclick="clearTags()" class="ml-auto text-[10px] text-slate-400 hover:text-red-500 font-medium">清空格式</button>
                 </div>
 
-                <!-- 文本编辑区 -->
-                <textarea id="cardText" rows="4" class="w-full p-2.5 border border-slate-200 rounded text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all placeholder:text-slate-300 font-sans" placeholder="支持选中文字后，通过上方工具栏赋予个别字体局部变色、加粗、局部字号、及特定局部字体款式等高级效果。"></textarea>
+                <!-- “代码 / 预览” 双模式选项卡 -->
+                <div class="flex border-x border-slate-200 bg-slate-50 text-[11px]">
+                    <button id="tabEdit" onclick="switchTextTab('edit')" class="px-3 py-1 font-semibold border-b-2 border-blue-600 text-blue-600">编辑代码</button>
+                    <button id="tabPreview" onclick="switchTextTab('preview')" class="px-3 py-1 font-semibold text-slate-400 hover:text-slate-600 border-b-2 border-transparent">样式预览</button>
+                </div>
+
+                <!-- 文本编辑与预览双窗口容器 -->
+                <div class="relative w-full">
+                    <!-- 1. 代码编辑窗口 -->
+                    <textarea id="cardText" rows="5" class="w-full p-2.5 border border-slate-200 rounded-b text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all placeholder:text-slate-300 font-sans" placeholder="支持选中文字后应用工具栏效果。"></textarea>
+                    
+                    <!-- 2. 样式预览窗口 -->
+                    <div id="cardTextPreview" class="hidden w-full h-[122px] p-2.5 border border-slate-200 rounded-b text-sm bg-slate-50 overflow-y-auto break-words whitespace-pre-wrap font-sans" style="line-height: 1.5;"></div>
+                </div>
                 
                 <div class="flex items-center space-x-4">
                     <div class="flex-1">
@@ -178,10 +186,10 @@
                     <img id="artImg" src="" class="absolute origin-center pointer-events-none select-none" style="transform: translate(0px, 0px) scale(1); max-width: none;" alt="" />
                 </div>
 
-                <!-- 图层 2: 卡框图片 (引入 crossorigin 并默认指向灰色图层) -->
+                <!-- 图层 2: 卡框图片 -->
                 <img id="frameImg" crossorigin="anonymous" src="https://i.ibb.co/d0FhfDRc/image.png" class="absolute inset-0 w-full h-full select-none pointer-events-none" style="z-index: 10;" alt="卡框加载中..." />
 
-                <!-- 图层 3: 文字信息区域 (采用最新确定的坐标范围) -->
+                <!-- 图层 3: 文字信息区域 -->
                 <div id="textRegion" class="absolute break-words overflow-hidden" style="z-index: 20; left: 80px; top: 1038px; width: 852px; height: 413px; color: #2d3748; font-size: 32px; line-height: 1.5; font-family: 'Noto Sans SC', sans-serif; word-wrap: break-word; white-space: pre-wrap;">这里是[b]加粗效果[/b]、[u]下划线效果[/u]以及[hl]高亮文本背景[/hl]的演示。您还可以随时[c=#ef4444]插入任意分段文字颜色[/c]。也可以使用特定[size=52]局部字号大小放大[/size]或切换[font=Ma Shan Zheng]局部字体款式[/font]。</div>
 
                 <!-- 图层 4: 区域选择交互遮罩层 -->
@@ -207,6 +215,7 @@
         const lockText = document.getElementById('lockText');
         
         const cardText = document.getElementById('cardText');
+        const cardTextPreview = document.getElementById('cardTextPreview');
         const fontSizeRange = document.getElementById('fontSizeRange');
         const fontSizeVal = document.getElementById('fontSizeVal');
         const textColor = document.getElementById('textColor');
@@ -246,13 +255,25 @@
         let initialDistance = 0;
         let initialScale = 1;
 
-        // 1. 卡框切换控制 (添加跨域安全及时间戳逻辑)
+        // 全局选区位置追踪记录 (解决 `<select>` 夺取焦点后浏览器清空选区的问题)
+        let savedSelection = { start: 0, end: 0 };
+
+        function updateSavedSelection() {
+            savedSelection.start = cardText.selectionStart;
+            savedSelection.end = cardText.selectionEnd;
+        }
+
+        // 监听所有可能更新选区范围的键盘与鼠标动作
+        cardText.addEventListener('keyup', updateSavedSelection);
+        cardText.addEventListener('mouseup', updateSavedSelection);
+        cardText.addEventListener('focus', updateSavedSelection);
+        cardText.addEventListener('input', updateSavedSelection);
+
+        // 1. 卡框切换控制 (防缓存安全模式)
         function setFrame(src, btnElement) {
-            // 每次切换时强制显式声明跨域匿名模式
             frameImg.removeAttribute('crossorigin');
             frameImg.setAttribute('crossorigin', 'anonymous');
             
-            // 附加动态时间戳防止浏览器强行读取无CORS头的缓存文件
             const cacheBuster = src + "?t=" + new Date().getTime();
             frameImg.src = cacheBuster;
 
@@ -270,9 +291,8 @@
             const file = e.target.files[0];
             if (file) {
                 const url = URL.createObjectURL(file);
-                frameImg.removeAttribute('crossorigin'); // 本地图片无需声明跨域
+                frameImg.removeAttribute('crossorigin');
                 frameImg.src = url;
-                // 取消默认卡框高亮
                 document.querySelectorAll('.frame-btn').forEach(btn => {
                     btn.classList.remove('border-blue-600');
                     btn.classList.add('border-transparent');
@@ -382,7 +402,7 @@
         }, { passive: false });
 
 
-        // 4. 富文本解析算法
+        // 4. 富文本标签解析核心算法
         function parseCardMarkup(text) {
             let safeText = text
                 .replace(/&/g, "&amp;")
@@ -410,16 +430,48 @@
             return safeText;
         }
 
-        // 渲染文本
+        // 双窗渲染同步控制
         function renderText() {
             const rawContent = cardText.value || '（在此输入卡牌文字信息）';
-            textRegion.innerHTML = parseCardMarkup(rawContent);
+            const parsedHTML = parseCardMarkup(rawContent);
+
+            textRegion.innerHTML = parsedHTML;
+
+            if (!cardTextPreview.classList.contains('hidden')) {
+                cardTextPreview.innerHTML = parsedHTML;
+            }
+        }
+
+        // 标签切换控制
+        function switchTextTab(mode) {
+            const tabEdit = document.getElementById('tabEdit');
+            const tabPreview = document.getElementById('tabPreview');
+
+            if (mode === 'edit') {
+                tabEdit.className = "px-3 py-1 font-semibold border-b-2 border-blue-600 text-blue-600";
+                tabPreview.className = "px-3 py-1 font-semibold text-slate-400 hover:text-slate-600 border-b-2 border-transparent";
+                cardText.classList.remove('hidden');
+                cardTextPreview.classList.add('hidden');
+                cardText.focus();
+                
+                // 恢复焦点时，重新校准选区高亮
+                cardText.setSelectionRange(savedSelection.start, savedSelection.end);
+            } else {
+                tabEdit.className = "px-3 py-1 font-semibold text-slate-400 hover:text-slate-600 border-b-2 border-transparent";
+                tabPreview.className = "px-3 py-1 font-semibold border-b-2 border-blue-600 text-blue-600";
+                cardText.classList.add('hidden');
+                cardTextPreview.classList.remove('hidden');
+                
+                cardTextPreview.innerHTML = parseCardMarkup(cardText.value || '（暂无输入内容）');
+                cardTextPreview.style.fontFamily = textRegion.style.fontFamily || "'Noto Sans SC', sans-serif";
+            }
         }
 
         cardText.addEventListener('input', renderText);
 
         fontFamilySelect.addEventListener('change', (e) => {
             textRegion.style.fontFamily = e.target.value;
+            cardTextPreview.style.fontFamily = e.target.value;
         });
 
         fontSizeRange.addEventListener('input', (e) => {
@@ -433,10 +485,15 @@
         });
 
 
-        // 5. 富文本标签插入及清空
+        // 5. 富文本标签高级包裹算法 (从全局记录值中提取选区，无视焦点丢失)
         function insertStyleTag(openTag, closeTag) {
-            const start = cardText.selectionStart;
-            const end = cardText.selectionEnd;
+            // 如果用户当前在“样式预览”选项卡下操作工具，自动先切回“代码编辑”以确保渲染流程完整
+            if (!cardTextPreview.classList.contains('hidden')) {
+                switchTextTab('edit');
+            }
+
+            const start = savedSelection.start;
+            const end = savedSelection.end;
             const fullText = cardText.value;
             const selectedText = fullText.substring(start, end);
 
@@ -444,8 +501,16 @@
             cardText.value = fullText.substring(0, start) + modifiedText + fullText.substring(end);
 
             renderText();
+
+            // 精准聚焦，并将焦点和选区高亮锁定在最内层文本范围上，以支持无缝的多重样式叠加嵌套
             cardText.focus();
-            cardText.setSelectionRange(start + openTag.length, start + openTag.length + selectedText.length);
+            const newStart = start + openTag.length;
+            const newEnd = newStart + selectedText.length;
+            cardText.setSelectionRange(newStart, newEnd);
+            
+            // 更新全局记录，准备下一次连续叠加
+            savedSelection.start = newStart;
+            savedSelection.end = newEnd;
         }
 
         function triggerSegmentColor() {
@@ -456,26 +521,27 @@
             insertStyleTag(`[c=${e.target.value}]`, '[/c]');
         });
 
-        // 应用局部字号
         function applyLocalSize(select) {
             const sizeValue = select.value;
             if (sizeValue) {
                 insertStyleTag(`[size=${sizeValue}]`, '[/size]');
-                select.value = ""; // 归位选择器
+                select.value = ""; 
             }
         }
 
-        // 应用局部款式
         function applyLocalFont(select) {
             const fontValue = select.value;
             if (fontValue) {
                 insertStyleTag(`[font=${fontValue}]`, '[/font]');
-                select.value = ""; // 归位选择器
+                select.value = ""; 
             }
         }
 
-        // 清空所有排版格式标签
         function clearTags() {
+            if (!cardTextPreview.classList.contains('hidden')) {
+                switchTextTab('edit');
+            }
+            
             let cleared = cardText.value;
             cleared = cleared.replace(/\[b\]/g, '').replace(/\[\/b\]/g, '');
             cleared = cleared.replace(/\[u\]/g, '').replace(/\[\/u\]/g, '');
@@ -485,6 +551,12 @@
             cleared = cleared.replace(/\[font=[^\]]+\]/g, '').replace(/\[\/font\]/g, '');
             cardText.value = cleared;
             renderText();
+            
+            // 重置选区为最前端
+            savedSelection.start = 0;
+            savedSelection.end = 0;
+            cardText.focus();
+            cardText.setSelectionRange(0, 0);
         }
 
 
@@ -588,7 +660,7 @@
         });
 
 
-        // 7. 导出生成 1024×1536 标准高分辨率卡牌 (html2canvas CORS 配置模式)
+        // 7. 导出生成 1024×1536 标准高分辨率卡牌
         exportBtn.addEventListener('click', () => {
             const isSelectorWasOpen = isSelectionMode;
             if (isSelectorWasOpen) {
@@ -598,15 +670,14 @@
             exportBtn.innerText = '正在生成高清晰度图像...';
             exportBtn.disabled = true;
 
-            // 临时重置 CSS Transform 比例，确保 100% 物理真实尺寸渲染
             cardContainer.style.transform = 'none';
 
             html2canvas(cardContainer, {
                 width: 1024,
                 height: 1536,
                 scale: 1, 
-                useCORS: true,       // 允许读取外域跨域资源
-                allowTaint: false,   // 禁止污染画布保证 dataURL 能成功导出
+                useCORS: true,       
+                allowTaint: false,   
                 backgroundColor: null,
                 logging: false
             }).then(canvas => {
