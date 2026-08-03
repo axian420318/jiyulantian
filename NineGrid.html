@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>阵营九宫格生成器</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --bg-color: #f5f7fa;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --border-color: #ddd;
+            --grid-line: #333;
+            --grid-gap: 2px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 15px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            margin-bottom: 5px;
+        }
+
+        p {
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        .container {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            width: 100%;
+            max-width: 480px; /*稍微缩小一点最大宽度，适应更多手机*/
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 输入区域样式优化 */
+        .setting-section {
+            width: 100%;
+            background: #fafafa;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+
+        .group-title {
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: #999;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .inputs-group {
+            display: flex;
+            justify-content: space-between; /* 均匀分布 */
+            gap: 8px;
+        }
+
+        .input-wrapper {
+            flex: 1;
+        }
+
+        .input-wrapper label {
+            display: block;
+            font-size: 0.7rem;
+            color: #aaa;
+            margin-bottom: 4px;
+            text-align: center;
+        }
+
+        .input-wrapper input {
+            width: 100%;
+            padding: 6px 4px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            text-align: center;
+            background: #fff;
+        }
+
+        .input-wrapper input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        /* 核心九宫格布局 - 优化挤压问题 */
+        .grid-wrapper {
+            display: flex; /* 改用 flex 更好控制宽高 */
+            align-items: center;
+            justify-content: center;
+            margin: 10px 0;
+            /* 确保在小屏幕上也不会溢出 */
+            width: 100%; 
+        }
+
+        /* 左侧纵向标签区 - 固定宽度 */
+        .y-axis-container {
+            width: 35px; 
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 5px;
+            margin-right: 10px; /* 增加与九宫格的间距 */
+        }
+
+        .y-axis-text {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            font-size: 0.8rem;
+            color: #555;
+            font-weight: bold;
+            letter-spacing: 2px;
+            white-space: nowrap;
+        }
+
+        /* 右侧主体区 (横向标签 + 九宫格) */
+        .main-grid-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+        }
+
+        /* 顶部横向标签区 */
+        .x-axis-container {
+            width: 100%;
+            height: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px; /* 增加与九宫格的间距 */
+            padding: 0 4px;
+        }
+
+        .x-axis-text {
+            font-size: 0.8rem;
+            color: #555;
+            font-weight: bold;
+            text-align: center;
+            flex: 1;
+        }
+
+        /* 九宫格 */
+        .nine-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            width: 100%; /* 填满剩余空间 */
+            max-width: 320px; /* 限制最大宽度，保持美观 */
+            aspect-ratio: 1 / 1;
+            background-color: var(--grid-line);
+            gap: var(--grid-gap);
+            border: 2px solid var(--grid-line);
+        }
+
+        .grid-cell {
+            background-color: #fff;
+            position: relative;
+            cursor: pointer;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.2s;
+        }
+
+        .grid-cell:active {
+            opacity: 0.8;
+        }
+
+        .grid-cell::after {
+            content: '+';
+            font-size: 1.8rem;
+            color: #e0e0e0;
+        }
+
+        .grid-cell img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+            pointer-events: none;
+        }
+
+        .grid-cell.has-image::after {
+            display: none;
+        }
+
+        .grid-cell.has-image img {
+            display: block;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: #f0f0f0;
+            color: #555;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.75);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>阵营九宫格生成器</h1>
+        <p>点击格子填图，自动生成高清图</p>
+    </header>
+
+    <div class="container">
+        
+        <!-- 设置区域 -->
+        <div class="setting-section">
+            <div class="group-title">横向标签</div>
+            <div class="inputs-group">
+                <div class="input-wrapper">
+                    <label>左</label>
+                    <input type="text" id="label-xl" value="混乱">
+                </div>
+                <div class="input-wrapper">
+                    <label>中</label>
+                    <input type="text" id="label-xc" value="中立">
+                </div>
+                <div class="input-wrapper">
+                    <label>右</label>
+                    <input type="text" id="label-xr" value="守序">
+                </div>
+            </div>
+        </div>
+
+        <div class="setting-section">
+            <div class="group-title">纵向标签</div>
+            <div class="inputs-group">
+                <div class="input-wrapper">
+                    <label>上</label>
+                    <input type="text" id="label-yt" value="善良">
+                </div>
+                <div class="input-wrapper">
+                    <label>中</label>
+                    <input type="text" id="label-yc" value="中庸"> <!-- 改为中庸 -->
+                </div>
+                <div class="input-wrapper">
+                    <label>下</label>
+                    <input type="text" id="label-yb" value="邪恶">
+                </div>
+            </div>
+        </div>
+
+        <!-- 九宫格主体 -->
+        <div class="grid-wrapper">
+            <!-- 左侧 Y 轴 -->
+            <div class="y-axis-container">
+                <span class="y-axis-text" id="disp-yt">善良</span>
+                <span class="y-axis-text" id="disp-yc">中庸</span>
+                <span class="y-axis-text" id="disp-yb">邪恶</span>
+            </div>
+
+            <!-- 右侧 主体 -->
+            <div class="main-grid-area">
+                <!-- 顶部 X 轴 -->
+                <div class="x-axis-container">
+                    <span class="x-axis-text" id="disp-xl">混乱</span>
+                    <span class="x-axis-text" id="disp-xc">中立</span>
+                    <span class="x-axis-text" id="disp-xr">守序</span>
+                </div>
+
+                <!-- 3x3 网格 -->
+                <div class="nine-grid" id="grid-container">
+                    <div class="grid-cell" data-index="0"><img src=""></div>
+                    <div class="grid-cell" data-index="1"><img src=""></div>
+                    <div class="grid-cell" data-index="2"><img src=""></div>
+                    <div class="grid-cell" data-index="3"><img src=""></div>
+                    <div class="grid-cell" data-index="4"><img src=""></div>
+                    <div class="grid-cell" data-index="5"><img src=""></div>
+                    <div class="grid-cell" data-index="6"><img src=""></div>
+                    <div class="grid-cell" data-index="7"><img src=""></div>
+                    <div class="grid-cell" data-index="8"><img src=""></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 按钮 -->
+        <div class="actions">
+            <button class="btn-secondary" id="reset-btn">清空</button>
+            <button class="btn-primary" id="download-btn">生成并下载图片</button>
+        </div>
+    </div>
+
+    <input type="file" id="file-input" accept="image/*">
+    <div class="toast" id="toast">提示消息</div>
+
+    <script>
+        const cells = document.querySelectorAll('.grid-cell');
+        const fileInput = document.getElementById('file-input');
+        const downloadBtn = document.getElementById('download-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const toastEl = document.getElementById('toast');
+        
+        // 输入框与显示文本映射
+        const settings = [
+            { inputId: 'label-xl', dispId: 'disp-xl' },
+            { inputId: 'label-xc', dispId: 'disp-xc' },
+            { inputId: 'label-xr', dispId: 'disp-xr' },
+            { inputId: 'label-yt', dispId: 'disp-yt' },
+            { inputId: 'label-yc', dispId: 'disp-yc' },
+            { inputId: 'label-yb', dispId: 'disp-yb' },
+        ];
+
+        let currentCellIndex = null;
+
+        // 初始化绑定
+        settings.forEach(item => {
+            const input = document.getElementById(item.inputId);
+            const disp = document.getElementById(item.dispId);
+            input.addEventListener('input', (e) => {
+                disp.textContent = e.target.value;
+            });
+        });
+
+        // 上传逻辑
+        cells.forEach(cell => {
+            cell.addEventListener('click', () => {
+                currentCellIndex = parseInt(cell.getAttribute('data-index'));
+                fileInput.click();
+            });
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                showToast('请选择图片文件');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const targetCell = cells[currentCellIndex];
+                targetCell.querySelector('img').src = event.target.result;
+                targetCell.classList.add('has-image');
+                fileInput.value = '';
+            };
+            reader.readAsDataURL(file);
+        });
+
+        resetBtn.addEventListener('click', () => {
+            if(confirm('确定要清空所有图片吗？')) {
+                cells.forEach(cell => {
+                    cell.classList.remove('has-image');
+                    cell.querySelector('img').src = '';
+                });
+                showToast('已清空');
+            }
+        });
+
+        downloadBtn.addEventListener('click', generateImage);
+
+        function generateImage() {
+            showToast('正在生成图片...', 2000);
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            const size = 1080;
+            const gap = 4; 
+
+            canvas.width = size;
+            canvas.height = size;
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, size, size);
+
+            // 布局参数
+            const startX = 200; 
+            const startY = 200;
+            const gridSide = size - 260; 
+            const cellSide = (gridSide - gap * 2) / 3; 
+
+            function drawText(text, x, y, fontSize = 38, isVertical = false) {
+                ctx.save();
+                ctx.fillStyle = '#333333';
+                ctx.font = `bold ${fontSize}px sans-serif`;
+                ctx.textBaseline = 'middle';
+                ctx.textAlign = 'center';
+                if (isVertical) {
+                    ctx.translate(x, y);
+                    ctx.rotate(-Math.PI / 2);
+                    ctx.fillText(text, 0, 0);
+                } else {
+                    ctx.fillText(text, x, y);
+                }
+                ctx.restore();
+            }
+
+            // --- 绘制 Y 轴 (左侧) ---
+            const yCenterLine = startX / 2;
+            drawText(document.getElementById('label-yt').value, yCenterLine, startY + cellSide / 2, 45, true);
+            drawText(document.getElementById('label-yc').value, yCenterLine, startY + gridSide / 2, 45, true);
+            drawText(document.getElementById('label-yb').value, yCenterLine, startY + gridSide - cellSide / 2, 45, true);
+
+            // --- 绘制 X 轴 (顶部) ---
+            const xCenterLine = startY / 2;
+            drawText(document.getElementById('label-xl').value, startX + cellSide / 2, xCenterLine, 45);
+            drawText(document.getElementById('label-xc').value, startX + gridSide / 2, xCenterLine, 45);
+            drawText(document.getElementById('label-xr').value, startX + gridSide - cellSide / 2, xCenterLine, 45);
+
+            // --- 绘制网格与图片 ---
+            ctx.fillStyle = '#eeeeee';
+            ctx.fillRect(startX, startY, gridSide, gridSide);
+
+            const promises = [];
+            for (let i = 0; i < 9; i++) {
+                const cell = cells[i];
+                const imgEl = cell.querySelector('img');
+                const row = Math.floor(i / 3);
+                const col = i % 3;
+                const dx = startX + col * (cellSide + gap);
+                const dy = startY + row * (cellSide + gap);
+
+                if (cell.classList.contains('has-image') && imgEl.src) {
+                    promises.push(new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            drawCover(ctx, img, dx, dy, cellSide, cellSide);
+                            resolve();
+                        };
+                        img.onerror = resolve;
+                        img.src = imgEl.src;
+                    }));
+                } else {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(dx, dy, cellSide, cellSide);
+                    // 简单的灰色加号
+                    ctx.strokeStyle = '#e0e0e0';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    const cx = dx + cellSide/2;
+                    const cy = dy + cellSide/2;
+                    const len = 15;
+                    ctx.moveTo(cx - len, cy);
+                    ctx.lineTo(cx + len, cy);
+                    ctx.moveTo(cx, cy - len);
+                    ctx.lineTo(cx, cy + len);
+                    ctx.stroke();
+                }
+            }
+
+            Promise.all(promises).then(() => {
+                try {
+                    const dataUrl = canvas.toDataURL('image/png');
+                    const link = document.createElement('a');
+                    link.download = '阵营九宫格_' + Date.now() + '.png';
+                    link.href = dataUrl;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    showToast('下载成功！');
+                } catch (err) {
+                    console.error(err);
+                    showToast('生成失败，请重试');
+                }
+            });
+        }
+
+        function drawCover(ctx, img, x, y, w, h) {
+            const imgRatio = img.width / img.height;
+            const winRatio = w / h;
+            let sx, sy, sWidth, sHeight;
+
+            if (imgRatio > winRatio) {
+                sHeight = img.height;
+                sWidth = sHeight * winRatio;
+                sx = (img.width - sWidth) / 2;
+                sy = 0;
+            } else {
+                sWidth = img.width;
+                sHeight = sWidth / winRatio;
+                sx = 0;
+                sy = (img.height - sHeight) / 2;
+            }
+            ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, w, h);
+        }
+
+        function showToast(msg, duration = 2000) {
+            toastEl.textContent = msg;
+            toastEl.classList.add('show');
+            setTimeout(() => {
+                toastEl.classList.remove('show');
+            }, duration);
+        }
+    </script>
+</body>
+</html>
