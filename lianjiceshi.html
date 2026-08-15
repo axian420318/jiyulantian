@@ -1,0 +1,233 @@
+
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Photon Realtime 联机诊断</title>
+<style>
+:root{--bg:#0b1020;--panel:#121a2b;--panel2:#0f1626;--line:#25304a;--text:#edf3ff;--muted:#96a5c1;--good:#36d399;--warn:#fbbf24;--bad:#fb7185;--accent:#6ea8fe}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#0a0f1c,#10182a);color:var(--text);font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{width:min(1180px,100%);margin:auto;padding:18px}.title{font-size:24px;font-weight:800}.sub{color:var(--muted);margin-top:4px}
+.grid{display:grid;grid-template-columns:360px 1fr;gap:14px;margin-top:16px}.card{background:rgba(18,26,43,.96);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 12px 30px #0004}.card h2{font-size:15px;margin:0 0 11px}.row{display:grid;grid-template-columns:1fr 1fr;gap:9px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}.field{margin-bottom:10px}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}input,select,button,textarea{width:100%;font:inherit;border-radius:9px;border:1px solid #33415f;background:#0d1423;color:var(--text);padding:9px 10px;outline:none}input:focus,select:focus,textarea:focus{border-color:var(--accent)}button{cursor:pointer;background:#18243b;border-color:#3a4c71;font-weight:700}button.primary{background:#1e5eff;border-color:#4e83ff}button.good{background:#123b2c;border-color:#236948}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.actions3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;font-size:12px;background:#1b263c;color:var(--muted)}.pill.good{color:#b8f7df;background:#103728}.pill.warn{color:#ffe6a2;background:#3a2c0b}.pill.bad{color:#ffc0cb;background:#3b111b}
+.status{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}.kv{display:grid;grid-template-columns:145px 1fr;gap:7px;border-top:1px solid var(--line);padding:7px 0}.kv:first-child{border-top:0}.k{color:var(--muted)}.v{overflow-wrap:anywhere}.log{height:420px;overflow:auto;background:#090e18;border:1px solid var(--line);border-radius:10px;padding:9px;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}.line{padding:2px 0;white-space:pre-wrap;overflow-wrap:anywhere}.info{color:#bfd0ee}.success{color:var(--good)}.warning{color:var(--warn)}.error{color:var(--bad)}.muted{color:var(--muted)}
+.room{display:grid;grid-template-columns:1fr 1fr;gap:10px}.big{font-size:30px;font-weight:800}.tester{display:grid;grid-template-columns:1fr 1fr;gap:12px}.testbox{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--panel2)}textarea{height:100px;resize:vertical}.code{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:#cfe0ff}.hidden{display:none}.footer{margin-top:12px;color:var(--muted);font-size:12px}@media(max-width:850px){.grid{grid-template-columns:1fr}.tester,.room{grid-template-columns:1fr}.log{height:360px}.row3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <div class="title">Photon Realtime H5 联机诊断台</div>
+  <div class="sub">用于验证：SDK 加载 → Name/Region → Master → 房间 → 双向事件 → RTT。建议两台设备/两个浏览器窗口使用同一个房间名测试。</div>
+
+  <div class="grid">
+    <section>
+      <div class="card">
+        <h2>① 连接参数</h2>
+        <div class="field"><label>Photon AppId</label><input id="appId" value="70265098-bc76-4bf5-9ba3-2089c6d56819"></div>
+        <div class="row">
+          <div class="field"><label>App Version</label><input id="appVersion" value="h5-diagnostic-1"></div>
+          <div class="field"><label>UserId / 昵称</label><input id="userId" value="test-"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Region</label><select id="region"><option value="asia">asia / 新加坡</option><option value="hk">hk / 香港</option><option value="jp">jp / 日本</option><option value="au">au / 澳大利亚</option><option value="in">in / 印度</option><option value="eu">eu / 欧洲</option><option value="cae">cae / 加拿大东部</option><option value="sa">sa / 南美</option><option value="za">za / 南非</option><option value="cn">cn / 中国大陆（需对应区域配置）</option><option value="in">in / 印度</option><option value="us">us / 美国东部（若 AppId 有该区域）</option></select></div>
+          <div class="field"><label>Transport</label><select id="transport"><option value="wss">WSS（推荐）</option><option value="ws">WS</option></select></div>
+        </div>
+        <div class="field"><label>Room Name</label><input id="room" value="photon-test-room"></div>
+        <div class="actions"><button class="primary" id="connectBtn">连接 Photon</button><button id="disconnectBtn">断开</button></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2>② 诊断动作</h2>
+        <div class="actions"><button id="roomBtn">创建/加入测试房间</button><button id="leaveBtn">离开房间</button></div>
+        <div class="actions"><button id="pingBtn">刷新 RTT</button><button id="eventBtn">发送测试事件</button></div>
+        <div class="actions"><button id="regionBtn">请求 Region 列表</button><button id="clearBtn">清空日志</button></div>
+        <div class="actions"><button id="exportBtn">导出诊断日志</button><button id="autoBtn">自动诊断</button></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2>③ 本机环境</h2>
+        <div id="env"></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="card">
+        <h2>连接状态</h2>
+        <div class="status" id="status"><span class="pill">未初始化</span></div>
+        <div class="kv"><div class="k">SDK</div><div class="v" id="sdk">检测中…</div></div>
+        <div class="kv"><div class="k">Photon 状态</div><div class="v" id="state">—</div></div>
+        <div class="kv"><div class="k">Name Server</div><div class="v" id="ns">—</div></div>
+        <div class="kv"><div class="k">Master Server</div><div class="v" id="master">—</div></div>
+        <div class="kv"><div class="k">Region</div><div class="v" id="currentRegion">—</div></div>
+        <div class="kv"><div class="k">Room</div><div class="v" id="currentRoom">—</div></div>
+        <div class="kv"><div class="k">Players</div><div class="v" id="players">—</div></div>
+        <div class="kv"><div class="k">RTT</div><div class="v big" id="rtt">—</div></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2>联机事件测试</h2>
+        <div class="tester">
+          <div class="testbox">
+            <div class="muted">发送内容</div>
+            <input id="eventText" value="hello from Photon H5">
+            <div class="actions" style="margin-top:8px"><button class="good" id="eventBtn2">发送 Event #1</button><button id="rttBtn2">RTT</button></div>
+          </div>
+          <div class="testbox">
+            <div class="muted">收到的 Event</div>
+            <div id="eventInbox" class="code">等待其他客户端事件…</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2>实时诊断日志</h2>
+        <div id="log" class="log"></div>
+      </div>
+    </section>
+  </div>
+  <div class="footer">说明：Photon Cloud 会先通过 Name Server 获取区域信息，再连接指定 Region 的 Master Server，之后才进入 Game Server/Room。不同区域是彼此独立的；因此“Master 能连上但进房间失败”与“完全无法连接”是两类问题。</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/photon-javascript-sdk@0.0.3/lib/Photon-Javascript_SDK.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const logEl = $('log');
+  const start = Date.now();
+  let client = null, roomJoinedAt = 0, firstConnectAt = 0;
+
+  function log(msg, type='info') {
+    const t = new Date().toLocaleTimeString();
+    const d = document.createElement('div'); d.className = 'line ' + type;
+    d.textContent = `[${t}] ${msg}`; logEl.appendChild(d); logEl.scrollTop = logEl.scrollHeight;
+  }
+  function setStatus(text, kind='') { $('status').innerHTML = `<span class="pill ${kind}">${escapeHtml(text)}</span>`; }
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function val(id){return $(id).value.trim()}
+  function protocol(){return val('transport') === 'ws' ? Photon.ConnectionProtocol.Ws : Photon.ConnectionProtocol.Wss}
+  function stateName(s){
+    try { return Photon.LoadBalancing.LoadBalancingClient.StateToName(s); } catch(e) { return String(s); }
+  }
+  function clientInfo() {
+    if (!client) return;
+    try { $('state').textContent = stateName(client.state()); } catch(e) {}
+    try { $('ns').textContent = client.getNameServerAddress() || '—'; } catch(e) {}
+    try { $('master').textContent = client.getMasterServerAddress() || '—'; } catch(e) {}
+    try { $('rtt').textContent = client.getRtt() + ' ms'; } catch(e) {}
+    try { $('currentRoom').textContent = client.isJoinedToRoom() && client.myRoom() ? client.myRoom().name : '—'; } catch(e) {}
+    try { $('players').textContent = client.isJoinedToRoom() ? client.myRoomActorCount() : '—'; } catch(e) {}
+    try { $('currentRegion').textContent = client.myRoom()?.region || $('region').value || '—'; } catch(e) { $('currentRegion').textContent = $('region').value || '—'; }
+  }
+  function env() {
+    const rows = [
+      ['URL', location.href], ['Origin', location.origin], ['Protocol', location.protocol],
+      ['WebSocket', typeof WebSocket !== 'undefined' ? '可用' : '不可用'],
+      ['Secure Context', window.isSecureContext ? '是' : '否（WSS 通常仍可由 HTTPS 页面正常使用；file:// 情况需特别留意）'],
+      ['Online', navigator.onLine ? '在线' : '离线'],
+      ['User Agent', navigator.userAgent]
+    ];
+    $('env').innerHTML = rows.map(r=>`<div class="kv"><div class="k">${escapeHtml(r[0])}</div><div class="v">${escapeHtml(r[1])}</div></div>`).join('');
+  }
+
+  function wireClient() {
+    const LB = Photon.LoadBalancing.LoadBalancingClient;
+    client = new LB(protocol(), val('appId'), val('appVersion'));
+    client.setLogLevel(Photon.LogLevel.DEBUG);
+    client.setUserId(val('userId') || ('test-' + Math.random().toString(36).slice(2,8)));
+
+    client.onStateChange = s => { $('state').textContent = stateName(s); log(`StateChange → ${stateName(s)} (${s})`, 'info'); clientInfo(); };
+    client.onError = (code,msg) => { log(`Client ERROR code=${code} msg=${msg}`, 'error'); setStatus('Photon 客户端错误', 'bad'); clientInfo(); };
+    client.onOperationResponse = (errorCode,errorMsg,code,content) => {
+      const text = `OperationResponse op=${code} error=${errorCode}${errorMsg ? ' / '+errorMsg : ''}`;
+      log(text, errorCode ? 'error' : 'info');
+      if (errorCode) log('响应内容: ' + safeJson(content), 'warning');
+      clientInfo();
+    };
+    client.onRoomList = rooms => { log(`收到 RoomList：${(rooms||[]).length} 个房间`, 'success'); clientInfo(); };
+    client.onRoomListUpdate = (rooms, updated, added, removed) => log(`RoomListUpdate：总计=${rooms?.length||0} 新增=${added?.length||0} 更新=${updated?.length||0} 移除=${removed?.length||0}`);
+    client.onActorJoin = actor => { log(`玩家进入：actorNr=${actor.actorNr} name=${actor.name}`, 'success'); clientInfo(); };
+    client.onActorLeave = (actor) => { log(`玩家离开：actorNr=${actor.actorNr} name=${actor.name}`, 'warning'); clientInfo(); };
+    client.onEvent = (code,content,actorNr) => { log(`收到 Event #${code} ← actor=${actorNr}: ${safeJson(content)}`, 'success'); $('eventInbox').textContent = `Event #${code} / actor ${actorNr}\n${safeJson(content)}`; };
+    client.onServerErrorInfo = info => log(`ServerErrorInfo: ${info}`, 'warning');
+    client.onAppStats = (ec,em,stats) => log(`AppStats peers=${stats?.peerCount} masterPeers=${stats?.masterPeerCount} games=${stats?.gameCount}`);
+    client.onGetRegionsResult = (ec,em,regions) => { log(`Region 列表返回 error=${ec} ${em||''}`, ec ? 'error':'success'); log('Regions: ' + safeJson(regions), ec?'error':'info'); };
+    client.onConnectedToMaster = () => { firstConnectAt ||= Date.now(); setStatus('已连接 Master', 'good'); log(`★ OnConnectedToMaster：耗时 ${Date.now()-firstConnectAt} ms`, 'success'); clientInfo(); };
+    client.onCreatedRoom = () => { log(`★ OnCreatedRoom：${client.myRoom()?.name || 'unknown'}`, 'success'); clientInfo(); };
+    client.onJoinedRoom = () => { roomJoinedAt = Date.now(); setStatus('已进入 Room', 'good'); log(`★ OnJoinedRoom：${client.myRoom()?.name || 'unknown'}；RTT=${client.getRtt()} ms`, 'success'); clientInfo(); };
+    client.onJoinRoomFailed = (code,msg) => log(`JoinRoomFailed code=${code} msg=${msg}`, 'error');
+    client.onCreateRoomFailed = (code,msg) => log(`CreateRoomFailed code=${code} msg=${msg}`, 'error');
+    client.onLeftRoom = () => { log('★ OnLeftRoom'); setStatus('已连接 Master', 'good'); clientInfo(); };
+  }
+
+  function safeJson(x){ try{return JSON.stringify(x);}catch(e){return String(x)} }
+
+  async function connect() {
+    if (!val('appId')) return log('AppId 为空', 'error');
+    if (client) { try{client.disconnect()}catch(e){} client = null; }
+    $('userId').value = $('userId').value.replace(/^test-$/, 'test-' + Math.random().toString(36).slice(2,8));
+    log('----- 开始连接诊断 -----');
+    log(`AppId=${val('appId')}, AppVersion=${val('appVersion')}, Region=${val('region')}, Protocol=${val('transport')}`);
+    wireClient();
+    setStatus('连接中…', 'warn');
+    firstConnectAt = Date.now();
+    let ok = false;
+    try { ok = client.connectToRegionMaster(val('region')); } catch(e) { log('调用 connectToRegionMaster 异常：'+e.stack, 'error'); return; }
+    log(`connectToRegionMaster(${val('region')}) 返回 ${ok}`, ok?'info':'error');
+    clientInfo();
+    if (!ok) log('Photon 客户端当前状态不允许发起连接；请先断开/重载后再试。', 'error');
+  }
+
+  function disconnect(){
+    if (!client) return log('当前没有 Photon 客户端实例', 'warning');
+    try{client.disconnect(); log('已请求 disconnect()');}catch(e){log('disconnect 异常：'+e,'error')}
+    setStatus('已断开'); clientInfo();
+  }
+  function roomTest(){
+    if (!client || !client.isConnectedToMaster()) return log('不能创建/加入房间：当前尚未连接 Master。', 'error');
+    const name = val('room');
+    if (!name) return log('Room Name 为空', 'error');
+    log(`开始房间测试：${name}`);
+    try {
+      const ret = client.createRoom(name, {isVisible:true,isOpen:true,maxPlayers:8,customGameProperties:{diag:1},propsListedInLobby:['diag']});
+      log(`createRoom(${name}) 返回 ${ret}`);
+      if (!ret) {
+        log('createRoom 没有发送；尝试 joinRoom。', 'warning');
+        const jr = client.joinRoom(name); log(`joinRoom(${name}) 返回 ${jr}`);
+      }
+    } catch(e) { log('createRoom/joinRoom 异常：'+e.stack,'error'); }
+  }
+  function leave(){ if(!client?.isJoinedToRoom()) return log('当前不在 Room','warning'); try{client.leaveRoom();log('已请求 leaveRoom()')}catch(e){log('leaveRoom 异常：'+e,'error')} }
+  function ping(){ if(!client) return log('还没有连接','warning'); try{client.updateRtt(); setTimeout(()=>{clientInfo();log(`RTT=${client.getRtt()} ms`,'success')},500)}catch(e){log('RTT 测量异常：'+e,'error')} }
+  function event(){
+    if(!client?.isJoinedToRoom()) return log('不能发送 Event：当前不在 Room。','error');
+    const content={text:val('eventText'),from:val('userId'),ts:Date.now()};
+    try{const ret=client.raiseEvent(1,content,{receivers:Photon.LoadBalancing.Constants.ReceiverGroup.Others});log('发送 Event #1：'+safeJson(content)+'；返回 '+ret, ret?'success':'error')}catch(e){log('raiseEvent 异常：'+e.stack,'error')}
+  }
+  function regionList(){
+    if(!client) wireClient();
+    try { const ok=client.connectToNameServer(); log('connectToNameServer() 返回 '+ok); setStatus('连接 Name Server…','warn'); setTimeout(()=>{try{client.getRegions();log('已请求 getRegions()')}catch(e){log('getRegions 异常：'+e,'error')}},1200);}catch(e){log('NameServer 连接异常：'+e,'error')}
+  }
+  function clearLog(){logEl.innerHTML='';}
+  function exportLog(){
+    const text = [...logEl.querySelectorAll('.line')].map(x=>x.textContent).join('\n');
+    const meta = `Photon Realtime Diagnostic\nTime=${new Date().toISOString()}\nAppId=${val('appId')}\nRegion=${val('region')}\nProtocol=${val('transport')}\nRoom=${val('room')}\nUserAgent=${navigator.userAgent}\n\n`;
+    const blob=new Blob([meta+text],{type:'text/plain;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='photon-diagnostic-'+Date.now()+'.txt'; a.click(); URL.revokeObjectURL(a.href);
+  }
+  async function autoDiag(){
+    log('===== 自动诊断开始 =====');
+    env();
+    if(typeof Photon==='undefined'){log('❌ Photon SDK 没有加载。检查 CDN/网络，或把 SDK 本地文件放在页面中。','error');return}
+    log('✓ Photon SDK 已加载，Version='+ (Photon.Version || 'unknown'),'success');
+    log('✓ WebSocket='+(typeof WebSocket!=='undefined')+' / online='+navigator.onLine,'success');
+    await connect();
+    setTimeout(()=>{if(client?.isConnectedToMaster()){log('✓ Master 阶段通过，继续房间测试。','success');roomTest();}else log('⚠ 还没有进入 Master；请看前面的 StateChange / Client ERROR / OperationResponse。','warning')},3500);
+  }
+
+  $('connectBtn').onclick=connect; $('disconnectBtn').onclick=disconnect; $('roomBtn').onclick=roomTest; $('leaveBtn').onclick=leave; $('pingBtn').onclick=ping; $('eventBtn').onclick=event; $('eventBtn2').onclick=event; $('rttBtn2').onclick=ping; $('regionBtn').onclick=regionList; $('clearBtn').onclick=clearLog; $('exportBtn').onclick=exportLog; $('autoBtn').onclick=autoDiag;
+  env();
+  if(typeof Photon!=='undefined') $('sdk').textContent='已加载：'+(Photon.Version || 'Photon JavaScript SDK'); else $('sdk').textContent='加载失败：Photon 全局对象不存在';
+  log('诊断页已启动。建议先点“自动诊断”；如果报错，再点“导出诊断日志”。');
+  if(location.protocol==='file:') log('当前页面是 file://。如果 Photon 因浏览器安全策略加载/连接异常，请将此 HTML 放到 HTTP(S) 静态服务器再测试。','warning');
+})();
+</script>
+</body>
+</html>
