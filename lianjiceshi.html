@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Photon Realtime 联机诊断</title>
+<title>Photon Realtime 联机诊断2.0 v2026.08.15-02</title>
 <style>
 :root{--bg:#0b1020;--panel:#121a2b;--panel2:#0f1626;--line:#25304a;--text:#edf3ff;--muted:#96a5c1;--good:#36d399;--warn:#fbbf24;--bad:#fb7185;--accent:#6ea8fe}
 *{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#0a0f1c,#10182a);color:var(--text);font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -15,7 +15,7 @@ main{width:min(1180px,100%);margin:auto;padding:18px}.title{font-size:24px;font-
 </head>
 <body>
 <main>
-  <div class="title">Photon Realtime H5 联机诊断台</div>
+  <div class="title">Photon Realtime H5 联机诊断台 <span class="pill good">BUILD 2026.08.15-02</span></div>
   <div class="sub">用于验证：SDK 加载 → Name/Region → Master → 房间 → 双向事件 → RTT。建议两台设备/两个浏览器窗口使用同一个房间名测试。</div>
 
   <div class="grid">
@@ -137,10 +137,7 @@ main{width:min(1180px,100%);margin:auto;padding:18px}.title{font-size:24px;font-
   function wireClient() {
     const LB = Photon.LoadBalancing.LoadBalancingClient;
     client = new LB(protocol(), val('appId'), val('appVersion'));
-    // 官方 4.x SDK 不需要通过 Photon.Logger.DEBUG 绑定连接；诊断完全由回调记录。
-    if (typeof client.setLogLevel === 'function' && Photon.LogLevel && Photon.LogLevel.INFO !== undefined) {
-      try { client.setLogLevel(Photon.LogLevel.INFO); } catch (_) {}
-    }
+    // 故意不调用 setLogLevel：不同 Photon Web SDK 构建的 LogLevel 导出不同，诊断页面不依赖它。
     client.setUserId(val('userId') || ('test-' + Math.random().toString(36).slice(2,8)));
 
     client.onStateChange = s => { $('state').textContent = stateName(s); log(`StateChange → ${stateName(s)} (${s})`, 'info'); clientInfo(); };
@@ -255,7 +252,8 @@ main{width:min(1180px,100%);margin:auto;padding:18px}.title{font-size:24px;font-
   function clearLog(){logEl.innerHTML='';}
   function exportLog(){
     const text = [...logEl.querySelectorAll('.line')].map(x=>x.textContent).join('\n');
-    const meta = `Photon Realtime Diagnostic\nTime=${new Date().toISOString()}\nAppId=${val('appId')}\nRegion=${val('region')}\nProtocol=${val('transport')}\nRoom=${val('room')}\nUserAgent=${navigator.userAgent}\n\n`;
+    const meta = `Photon Realtime Diagnostic
+Build=2026.08.15-02\nTime=${new Date().toISOString()}\nAppId=${val('appId')}\nRegion=${val('region')}\nProtocol=${val('transport')}\nRoom=${val('room')}\nUserAgent=${navigator.userAgent}\n\n`;
     const blob=new Blob([meta+text],{type:'text/plain;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='photon-diagnostic-'+Date.now()+'.txt'; a.click(); URL.revokeObjectURL(a.href);
   }
   async function autoDiag(){
@@ -272,7 +270,7 @@ main{width:min(1180px,100%);margin:auto;padding:18px}.title{font-size:24px;font-
   $('connectBtn').onclick=connect; $('disconnectBtn').onclick=disconnect; $('roomBtn').onclick=roomTest; $('leaveBtn').onclick=leave; $('pingBtn').onclick=ping; $('eventBtn').onclick=event; $('eventBtn2').onclick=event; $('rttBtn2').onclick=ping; $('regionBtn').onclick=regionList; $('clearBtn').onclick=clearLog; $('exportBtn').onclick=exportLog; $('autoBtn').onclick=autoDiag;
   env();
   if(typeof Photon!=='undefined') $('sdk').textContent='已加载：'+(Photon.Version || 'Photon JavaScript SDK'); else $('sdk').textContent='加载失败：Photon 全局对象不存在';
-  log('诊断页已启动。SDK 采用 photon-realtime 4.4.0；连接流程按官方 onStateChange/connectToRegionMaster 示例实现。');
+  log('诊断页已启动。BUILD=2026.08.15-02；SDK=photon-realtime@4.4.0；连接流程按官方 onStateChange/connectToRegionMaster 示例。若看到旧 DEBUG 报错，说明 GitHub Pages/浏览器仍缓存旧 HTML。');
   if(location.protocol==='file:') log('当前页面是 file://。如果 Photon 因浏览器安全策略加载/连接异常，请将此 HTML 放到 HTTP(S) 静态服务器再测试。','warning');
 })();
 </script>
