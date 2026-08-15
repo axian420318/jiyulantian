@@ -87,7 +87,7 @@ main{width:min(1180px,100%);margin:auto;padding:18px}.title{font-size:24px;font-
   <div class="footer">本页特别注意：`cn`（中国大陆）需要 AppId 获得中国区访问权限，且中国大陆客户端应使用 `ns.photonengine.cn`；普通海外 AppId/客户端测试建议先使用 `hk` 或 `asia`。
 <br><br>说明：Photon Cloud 会先通过 Name Server 获取区域信息，再连接指定 Region 的 Master Server，之后才进入 Game Server/Room。不同区域是彼此独立的；因此“Master 能连上但进房间失败”与“完全无法连接”是两类问题。</div>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/photon-javascript-sdk@0.0.3/lib/Photon-Javascript_SDK.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/photon-realtime@4.4.0/lib/photon.js"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
@@ -137,7 +137,10 @@ main{width:min(1180px,100%);margin:auto;padding:18px}.title{font-size:24px;font-
   function wireClient() {
     const LB = Photon.LoadBalancing.LoadBalancingClient;
     client = new LB(protocol(), val('appId'), val('appVersion'));
-    client.setLogLevel(Photon.LogLevel.DEBUG);
+    // 官方 4.x SDK 不需要通过 Photon.Logger.DEBUG 绑定连接；诊断完全由回调记录。
+    if (typeof client.setLogLevel === 'function' && Photon.LogLevel && Photon.LogLevel.INFO !== undefined) {
+      try { client.setLogLevel(Photon.LogLevel.INFO); } catch (_) {}
+    }
     client.setUserId(val('userId') || ('test-' + Math.random().toString(36).slice(2,8)));
 
     client.onStateChange = s => { $('state').textContent = stateName(s); log(`StateChange → ${stateName(s)} (${s})`, 'info'); clientInfo(); };
@@ -157,8 +160,9 @@ main{width:min(1180px,100%);margin:auto;padding:18px}.title{font-size:24px;font-
     client.onAppStats = (ec,em,stats) => log(`AppStats peers=${stats?.peerCount} masterPeers=${stats?.masterPeerCount} games=${stats?.gameCount}`);
     client.onGetRegionsResult = (ec,em,regions) => { log(`Region 列表返回 error=${ec} ${em||''}`, ec ? 'error':'success'); log('Regions: ' + safeJson(regions), ec?'error':'info'); };
     client.onConnectedToMaster = () => { firstConnectAt ||= Date.now(); setStatus('已连接 Master', 'good'); log(`★ OnConnectedToMaster：耗时 ${Date.now()-firstConnectAt} ms`, 'success'); clientInfo(); };
+    client.onConnectedToNameServer = () => { log('★ OnConnectedToNameServer：Name Server 已连接，准备进入 Region Master', 'success'); clientInfo(); };
     client.onCreatedRoom = () => { log(`★ OnCreatedRoom：${client.myRoom()?.name || 'unknown'}`, 'success'); clientInfo(); };
-    client.onJoinedRoom = () => { roomJoinedAt = Date.now(); setStatus('已进入 Room', 'good'); log(`★ OnJoinedRoom：${client.myRoom()?.name || 'unknown'}；RTT=${client.getRtt()} ms`, 'success'); clientInfo(); };
+    client.onJoinedRoom = () => { roomJoinedAt = Date.now(); setStatus('已进入 Room', 'good'); let r='—'; try{r=client.getRtt()+' ms'}catch(_){} log(`★ OnJoinedRoom：${client.myRoom()?.name || 'unknown'}；RTT=${r}`, 'success'); clientInfo(); };
     client.onJoinRoomFailed = (code,msg) => log(`JoinRoomFailed code=${code} msg=${msg}`, 'error');
     client.onCreateRoomFailed = (code,msg) => log(`CreateRoomFailed code=${code} msg=${msg}`, 'error');
     client.onLeftRoom = () => { log('★ OnLeftRoom'); setStatus('已连接 Master', 'good'); clientInfo(); };
@@ -230,8 +234,23 @@ main{width:min(1180px,100%);margin:auto;padding:18px}.title{font-size:24px;font-
     try{const ret=client.raiseEvent(1,content,{receivers:Photon.LoadBalancing.Constants.ReceiverGroup.Others});log('发送 Event #1：'+safeJson(content)+'；返回 '+ret, ret?'success':'error')}catch(e){log('raiseEvent 异常：'+e.stack,'error')}
   }
   function regionList(){
-    if(!client) wireClient();
-    try { const ok=client.connectToNameServer(); log('connectToNameServer() 返回 '+ok); setStatus('连接 Name Server…','warn'); setTimeout(()=>{try{client.getRegions();log('已请求 getRegions()')}catch(e){log('getRegions 异常：'+e,'error')}},1200);}catch(e){log('NameServer 连接异常：'+e,'error')}
+    if(!client){ wireClient(); }
+    try {
+      if (client.isConnectedToNameServer && client.isConnectedToNameServer()) {
+        client.getRegions();
+        log('已在 Name Server，直接请求 getRegions()');
+      } else {
+        const ok=client.connectToNameServer();
+        log('connectToNameServer() 返回 '+ok);
+        setStatus('连接 Name Server…','warn');
+        setTimeout(()=>{
+          try {
+            if(client.isConnectedToNameServer && client.isConnectedToNameServer()){ client.getRegions(); log('Name Server 已连接，已请求 getRegions()'); }
+            else log('1200ms 后仍未连接 Name Server，getRegions() 不发送。','warning');
+          } catch(e){log('getRegions 异常：'+(e.stack||e),'error')}
+        },1200);
+      }
+    }catch(e){log('NameServer 连接异常：'+(e.stack||e),'error')}
   }
   function clearLog(){logEl.innerHTML='';}
   function exportLog(){
@@ -244,7 +263,7 @@ main{width:min(1180px,100%);margin:auto;padding:18px}.title{font-size:24px;font-
     env();
     if(typeof Photon==='undefined'){log('❌ Photon SDK 没有加载。检查 CDN/网络，或把 SDK 本地文件放在页面中。','error');return}
     log('✓ Photon SDK 已加载，Version='+ (Photon.Version || 'unknown'),'success');
-    try { const L = Photon.LoadBalancing.LoadBalancingClient; log('SDK API: connectToRegionMaster=' + (typeof L.prototype.connectToRegionMaster) + ', getRtt=' + (typeof L.prototype.getRtt) + ', updateRtt=' + (typeof L.prototype.updateRtt) + ', createRoom=' + (typeof L.prototype.createRoom) + ', joinRoom=' + (typeof L.prototype.joinRoom) + ', raiseEvent=' + (typeof L.prototype.raiseEvent), 'info'); } catch(e) { log('SDK API 检测异常: '+e, 'warning'); }
+    try { const L = Photon.LoadBalancing.LoadBalancingClient; log('SDK API: connectToRegionMaster=' + (typeof L.prototype.connectToRegionMaster) + ', getRtt=' + (typeof L.prototype.getRtt) + ', updateRtt=' + (typeof L.prototype.updateRtt) + ', createRoom=' + (typeof L.prototype.createRoom) + ', joinRoom=' + (typeof L.prototype.joinRoom) + ', raiseEvent=' + (typeof L.prototype.raiseEvent) + ', connectToNameServer=' + (typeof L.prototype.connectToNameServer), 'info'); } catch(e) { log('SDK API 检测异常: '+e, 'warning'); }
     log('✓ WebSocket='+(typeof WebSocket!=='undefined')+' / online='+navigator.onLine,'success');
     await connect();
     setTimeout(()=>{if(client?.isConnectedToMaster()){log('✓ Master 阶段通过，继续房间测试。','success');roomTest();}else log('⚠ 还没有进入 Master；请看前面的 StateChange / Client ERROR / OperationResponse。','warning')},3500);
@@ -253,7 +272,7 @@ main{width:min(1180px,100%);margin:auto;padding:18px}.title{font-size:24px;font-
   $('connectBtn').onclick=connect; $('disconnectBtn').onclick=disconnect; $('roomBtn').onclick=roomTest; $('leaveBtn').onclick=leave; $('pingBtn').onclick=ping; $('eventBtn').onclick=event; $('eventBtn2').onclick=event; $('rttBtn2').onclick=ping; $('regionBtn').onclick=regionList; $('clearBtn').onclick=clearLog; $('exportBtn').onclick=exportLog; $('autoBtn').onclick=autoDiag;
   env();
   if(typeof Photon!=='undefined') $('sdk').textContent='已加载：'+(Photon.Version || 'Photon JavaScript SDK'); else $('sdk').textContent='加载失败：Photon 全局对象不存在';
-  log('诊断页已启动。建议先点“自动诊断”；如果报错，再点“导出诊断日志”。');
+  log('诊断页已启动。SDK 采用 photon-realtime 4.4.0；连接流程按官方 onStateChange/connectToRegionMaster 示例实现。');
   if(location.protocol==='file:') log('当前页面是 file://。如果 Photon 因浏览器安全策略加载/连接异常，请将此 HTML 放到 HTTP(S) 静态服务器再测试。','warning');
 })();
 </script>
