@@ -1,278 +1,754 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Photon Realtime 联机诊断2.0 v2026.08.15-02</title>
-<style>
-:root{--bg:#0b1020;--panel:#121a2b;--panel2:#0f1626;--line:#25304a;--text:#edf3ff;--muted:#96a5c1;--good:#36d399;--warn:#fbbf24;--bad:#fb7185;--accent:#6ea8fe}
-*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#0a0f1c,#10182a);color:var(--text);font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-main{width:min(1180px,100%);margin:auto;padding:18px}.title{font-size:24px;font-weight:800}.sub{color:var(--muted);margin-top:4px}
-.grid{display:grid;grid-template-columns:360px 1fr;gap:14px;margin-top:16px}.card{background:rgba(18,26,43,.96);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 12px 30px #0004}.card h2{font-size:15px;margin:0 0 11px}.row{display:grid;grid-template-columns:1fr 1fr;gap:9px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}.field{margin-bottom:10px}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}input,select,button,textarea{width:100%;font:inherit;border-radius:9px;border:1px solid #33415f;background:#0d1423;color:var(--text);padding:9px 10px;outline:none}input:focus,select:focus,textarea:focus{border-color:var(--accent)}button{cursor:pointer;background:#18243b;border-color:#3a4c71;font-weight:700}button.primary{background:#1e5eff;border-color:#4e83ff}button.good{background:#123b2c;border-color:#236948}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.actions3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;font-size:12px;background:#1b263c;color:var(--muted)}.pill.good{color:#b8f7df;background:#103728}.pill.warn{color:#ffe6a2;background:#3a2c0b}.pill.bad{color:#ffc0cb;background:#3b111b}
-.status{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}.kv{display:grid;grid-template-columns:145px 1fr;gap:7px;border-top:1px solid var(--line);padding:7px 0}.kv:first-child{border-top:0}.k{color:var(--muted)}.v{overflow-wrap:anywhere}.log{height:420px;overflow:auto;background:#090e18;border:1px solid var(--line);border-radius:10px;padding:9px;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}.line{padding:2px 0;white-space:pre-wrap;overflow-wrap:anywhere}.info{color:#bfd0ee}.success{color:var(--good)}.warning{color:var(--warn)}.error{color:var(--bad)}.muted{color:var(--muted)}
-.room{display:grid;grid-template-columns:1fr 1fr;gap:10px}.big{font-size:30px;font-weight:800}.tester{display:grid;grid-template-columns:1fr 1fr;gap:12px}.testbox{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--panel2)}textarea{height:100px;resize:vertical}.code{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:#cfe0ff}.hidden{display:none}.footer{margin-top:12px;color:var(--muted);font-size:12px}@media(max-width:850px){.grid{grid-template-columns:1fr}.tester,.room{grid-template-columns:1fr}.log{height:360px}.row3{grid-template-columns:1fr}}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0f0f1a">
+    <title>狼人杀 - 房间管理 (Supabase + Trystero)</title>
+    <style>
+        :root {
+            --bg: #0f0f1a;
+            --bg-secondary: #1a1a2e;
+            --bg-input: #1e2a45;
+            --text: #e8e8f0;
+            --text-secondary: #a0a0b8;
+            --text-muted: #6b6b85;
+            --accent: #5b8def;
+            --accent-hover: #4a7dde;
+            --accent-glow: rgba(91, 141, 239, 0.25);
+            --danger: #ef5b5b;
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --border: #2a2a42;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+            --radius: 16px;
+            --radius-sm: 10px;
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --header-h: 56px;
+            --footer-h: 64px;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 16px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .screen {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+            padding-top: var(--safe-top);
+            padding-bottom: var(--safe-bottom);
+            padding-left: var(--safe-left, 0);
+            padding-right: var(--safe-right, 0);
+            animation: fadeIn 0.25s ease;
+        }
+        .screen.active { display: flex; }
+        @keyframes fadeIn { from { opacity:0; transform: translateY(8px);} to { opacity:1; transform: translateY(0);} }
+        @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+        @keyframes spin { to { transform: rotate(360deg);} }
+
+        /* 首页 */
+        #home-screen {
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(ellipse at 50% 30%, #1a1a3a 0%, var(--bg) 70%);
+            padding: 24px 20px;
+        }
+        .home-container {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            animation: slideUp 0.4s ease;
+        }
+        @keyframes slideUp { from { opacity:0; transform: translateY(24px) scale(0.98);} to { opacity:1; transform: translateY(0) scale(1);} }
+        .app-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 22px;
+            background: linear-gradient(135deg, #5b8def 0%, #7b5bef 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            box-shadow: 0 8px 32px var(--accent-glow);
+        }
+        .app-title {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            background: linear-gradient(135deg, #e8e8f0 0%, #a0b8e8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .app-subtitle { font-size: 14px; color: var(--text-muted); text-align: center; margin-top: -8px; }
+        .home-divider { display: flex; align-items: center; gap: 12px; width: 100%; margin: 4px 0; }
+        .home-divider::before, .home-divider::after { content:''; flex:1; height:1px; background: var(--border); }
+        .home-divider span { font-size:13px; color:var(--text-muted); letter-spacing:1px; }
+        .btn {
+            width: 100%;
+            padding: 14px 20px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 0.3px;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: linear-gradient(135deg, #5b8def 0%, #4a7dde 100%); color: #fff; box-shadow: 0 4px 20px var(--accent-glow); }
+        .btn-secondary { background: var(--bg-input); color: var(--text); border: 1px solid var(--border); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn .btn-loading {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        .input-group { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+        .input-label { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+        .input-field {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-input);
+            color: var(--text);
+            font-size: 17px;
+            font-weight: 500;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            -webkit-user-select: text;
+            user-select: text;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .input-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .error-text { font-size: 13px; color: var(--danger); min-height: 20px; text-align: center; }
+
+        /* 房间等待/游戏界面 */
+        #room-screen { background: var(--bg); }
+        .room-header {
+            height: var(--header-h);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            z-index: 10;
+        }
+        .header-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+        .btn-back { background: none; border: none; color: var(--text); font-size: 24px; padding: 6px 8px; cursor: pointer; border-radius: 8px; }
+        .btn-back:active { background: var(--bg-input); }
+        .room-info { display: flex; flex-direction: column; min-width: 0; }
+        .room-code-row { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+        .room-code { font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .copy-icon { font-size: 13px; opacity: 0.6; flex-shrink: 0; }
+        .room-status { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+        .status-dot.connecting { background: var(--warning); animation: pulse 1.2s infinite; }
+        .status-dot.online { background: var(--success); }
+        .status-dot.offline { background: var(--danger); }
+        .header-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+        .peer-badge { display: flex; align-items: center; gap: 5px; background: var(--bg-input); border-radius: 20px; padding: 5px 12px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+        .peer-badge .count { color: var(--accent); font-weight: 700; }
+
+        .room-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .player-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .player-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+        }
+        .player-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #fff;
+            background: var(--accent);
+            flex-shrink: 0;
+        }
+        .player-name { font-weight: 600; font-size: 15px; }
+        .player-badge { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+        .waiting-hint {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 14px;
+            animation: pulse 2s infinite;
+        }
+
+        .toast {
+            position: fixed;
+            top: calc(var(--safe-top) + 60px);
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: var(--bg-secondary);
+            color: var(--text);
+            padding: 10px 20px;
+            border-radius: 24px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s ease;
+            z-index: 1100;
+            white-space: nowrap;
+            max-width: 90%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .toast.success { border-color: var(--success); color: var(--success); }
+        .toast.error { border-color: var(--danger); color: var(--danger); }
+
+        @media (min-width: 600px) {
+            .home-container { max-width: 360px; }
+            #room-screen { max-width: 600px; margin: 0 auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); box-shadow: var(--shadow); }
+        }
+    </style>
 </head>
 <body>
-<main>
-  <div class="title">Photon Realtime H5 联机诊断台 <span class="pill good">BUILD 2026.08.15-02</span></div>
-  <div class="sub">用于验证：SDK 加载 → Name/Region → Master → 房间 → 双向事件 → RTT。建议两台设备/两个浏览器窗口使用同一个房间名测试。</div>
 
-  <div class="grid">
-    <section>
-      <div class="card">
-        <h2>① 连接参数</h2>
-        <div class="field"><label>Photon AppId</label><input id="appId" value="70265098-bc76-4bf5-9ba3-2089c6d56819"></div>
-        <div class="row">
-          <div class="field"><label>App Version</label><input id="appVersion" value="h5-diagnostic-1"></div>
-          <div class="field"><label>UserId / 昵称</label><input id="userId" value="test-"></div>
+    <!-- 首页 -->
+    <div id="home-screen" class="screen active">
+        <div class="home-container">
+            <div class="app-icon">🐺</div>
+            <div class="app-title">狼人杀 · 房间系统</div>
+            <div class="app-subtitle">Supabase 房间验证 + Trystero P2P 通信</div>
+
+            <button id="btn-create" class="btn btn-primary">
+                <span class="btn-text">➕ 创建房间</span>
+            </button>
+
+            <div class="home-divider"><span>或</span></div>
+
+            <div class="input-group">
+                <label class="input-label" for="room-id-input">输入房间码加入</label>
+                <input id="room-id-input" class="input-field" type="text"
+                placeholder="例如: K7M3PX" maxlength="6" autocomplete="off"
+                autocapitalize="characters" spellcheck="false">
+            </div>
+
+            <button id="btn-join" class="btn btn-secondary">
+                <span class="btn-text">🚪 加入房间</span>
+            </button>
+
+            <div id="home-error" class="error-text"></div>
         </div>
-        <div class="row">
-          <div class="field"><label>Region</label><select id="region"><option value="asia">asia / 新加坡</option><option value="hk">hk / 香港</option><option value="jp">jp / 日本</option><option value="au">au / 澳大利亚</option><option value="in">in / 印度</option><option value="kr">kr / 韩国</option><option value="tr">tr / 土耳其</option><option value="uae">uae / 阿联酋</option><option value="eu">eu / 欧洲</option><option value="cae">cae / 加拿大东部</option><option value="sa">sa / 南美</option><option value="za">za / 南非</option><option value="cn">cn / 中国大陆（需要 Photon 开通中国区）</option><option value="us">us / 美国东部</option><option value="usw">usw / 美国西部</option><option value="ussc">ussc / 美国中南</option></select></div>
-          <div class="field"><label>Transport</label><select id="transport"><option value="wss">WSS（推荐）</option><option value="ws">WS</option></select></div>
+    </div>
+
+    <!-- 房间界面 -->
+    <div id="room-screen" class="screen">
+        <header class="room-header">
+            <div class="header-left">
+                <button id="btn-leave" class="btn-back" aria-label="离开">←</button>
+                <div class="room-info">
+                    <div class="room-code-row" id="room-code-copy">
+                        <span class="room-code" id="room-code-display">------</span>
+                        <span class="copy-icon">📋</span>
+                    </div>
+                    <div class="room-status">
+                        <span id="status-dot" class="status-dot connecting"></span>
+                        <span id="status-text">正在连接...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="peer-badge">
+                    👥 <span class="count" id="peer-count">1</span> 人在线
+                </div>
+            </div>
+        </header>
+
+        <div class="room-body">
+            <div class="player-list" id="player-list">
+                <!-- 动态生成 -->
+            </div>
+            <div class="waiting-hint" id="waiting-hint">
+                等待其他玩家加入...
+            </div>
         </div>
-        <div class="field"><label>Room Name</label><input id="room" value="photon-test-room"></div>
-        <div class="actions"><button class="primary" id="connectBtn">连接 Photon</button><button id="disconnectBtn">断开</button></div>
-      </div>
+    </div>
 
-      <div class="card" style="margin-top:14px">
-        <h2>② 诊断动作</h2>
-        <div class="actions"><button id="roomBtn">创建/加入测试房间</button><button id="leaveBtn">离开房间</button></div>
-        <div class="actions"><button id="pingBtn">刷新 RTT</button><button id="eventBtn">发送测试事件</button></div>
-        <div class="actions"><button id="regionBtn">请求 Region 列表</button><button id="clearBtn">清空日志</button></div>
-        <div class="actions"><button id="exportBtn">导出诊断日志</button><button id="autoBtn">自动诊断</button></div>
-      </div>
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
 
-      <div class="card" style="margin-top:14px">
-        <h2>③ 本机环境</h2>
-        <div id="env"></div>
-      </div>
-    </section>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Trystero (用于后续 P2P 集成) -->
+    <script type="module">
+        import { joinRoom, selfId } from 'https://esm.sh/trystero@0.20.0';
 
-    <section>
-      <div class="card">
-        <h2>连接状态</h2>
-        <div class="status" id="status"><span class="pill">未初始化</span></div>
-        <div class="kv"><div class="k">SDK</div><div class="v" id="sdk">检测中…</div></div>
-        <div class="kv"><div class="k">Photon 状态</div><div class="v" id="state">—</div></div>
-        <div class="kv"><div class="k">Name Server</div><div class="v" id="ns">—</div></div>
-        <div class="kv"><div class="k">Master Server</div><div class="v" id="master">—</div></div>
-        <div class="kv"><div class="k">Region</div><div class="v" id="currentRegion">—</div></div>
-        <div class="kv"><div class="k">Room</div><div class="v" id="currentRoom">—</div></div>
-        <div class="kv"><div class="k">Players</div><div class="v" id="players">—</div></div>
-        <div class="kv"><div class="k">RTT</div><div class="v big" id="rtt">—</div></div>
-      </div>
+        // ==================== 配置 ====================
+        const supabaseUrl = 'https://orpoubeydftbdoxatnps.supabase.co';
+        const supabaseAnonKey = 'sb_publishable_QpgRQBXjtYfZfKEh98YKVg_WVgyEGSv';
+        const APP_ID = 'werewolf-room-test-v1';
+        const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        const ROOM_CODE_LENGTH = 6;
+        const INITIAL_GRACE_PERIOD = 5000;
 
-      <div class="card" style="margin-top:14px">
-        <h2>联机事件测试</h2>
-        <div class="tester">
-          <div class="testbox">
-            <div class="muted">发送内容</div>
-            <input id="eventText" value="hello from Photon H5">
-            <div class="actions" style="margin-top:8px"><button class="good" id="eventBtn2">发送 Event #1</button><button id="rttBtn2">RTT</button></div>
-          </div>
-          <div class="testbox">
-            <div class="muted">收到的 Event</div>
-            <div id="eventInbox" class="code">等待其他客户端事件…</div>
-          </div>
-        </div>
-      </div>
+        // ==================== 初始化 Supabase ====================
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
 
-      <div class="card" style="margin-top:14px">
-        <h2>实时诊断日志</h2>
-        <div id="log" class="log"></div>
-      </div>
-    </section>
-  </div>
-  <div class="footer">本页特别注意：`cn`（中国大陆）需要 AppId 获得中国区访问权限，且中国大陆客户端应使用 `ns.photonengine.cn`；普通海外 AppId/客户端测试建议先使用 `hk` 或 `asia`。
-<br><br>说明：Photon Cloud 会先通过 Name Server 获取区域信息，再连接指定 Region 的 Master Server，之后才进入 Game Server/Room。不同区域是彼此独立的；因此“Master 能连上但进房间失败”与“完全无法连接”是两类问题。</div>
-</main>
-<script src="https://cdn.jsdelivr.net/npm/photon-realtime@4.4.0/lib/photon.js"></script>
-<script>
-(() => {
-  const $ = id => document.getElementById(id);
-  window.addEventListener('error', e => { try { log(`WINDOW ERROR: ${e.message} @ ${e.filename || 'unknown'}:${e.lineno || '?'}:${e.colno || '?'}`, 'error'); } catch(_){} });
-  window.addEventListener('unhandledrejection', e => { try { log(`UNHANDLED REJECTION: ${e.reason?.stack || e.reason || 'unknown'}`, 'error'); } catch(_){} });
-  const _consoleError = console.error.bind(console);
-  console.error = (...args) => { try { log('console.error: ' + args.map(x => typeof x === 'string' ? x : safeJson(x)).join(' '), 'error'); } catch(_){} _consoleError(...args); };
-  const _consoleWarn = console.warn.bind(console);
-  console.warn = (...args) => { try { log('console.warn: ' + args.map(x => typeof x === 'string' ? x : safeJson(x)).join(' '), 'warning'); } catch(_){} _consoleWarn(...args); };
-  const logEl = $('log');
-  const start = Date.now();
-  let client = null, roomJoinedAt = 0, firstConnectAt = 0;
+        // ==================== DOM 元素 ====================
+        const homeScreen = document.getElementById('home-screen');
+        const roomScreen = document.getElementById('room-screen');
+        const btnCreate = document.getElementById('btn-create');
+        const btnJoin = document.getElementById('btn-join');
+        const roomIdInput = document.getElementById('room-id-input');
+        const homeError = document.getElementById('home-error');
+        const btnLeave = document.getElementById('btn-leave');
+        const roomCodeDisplay = document.getElementById('room-code-display');
+        const roomCodeCopy = document.getElementById('room-code-copy');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const peerCount = document.getElementById('peer-count');
+        const playerList = document.getElementById('player-list');
+        const waitingHint = document.getElementById('waiting-hint');
+        const toast = document.getElementById('toast');
 
-  function log(msg, type='info') {
-    const t = new Date().toLocaleTimeString();
-    const d = document.createElement('div'); d.className = 'line ' + type;
-    d.textContent = `[${t}] ${msg}`; logEl.appendChild(d); logEl.scrollTop = logEl.scrollHeight;
-  }
-  function setStatus(text, kind='') { $('status').innerHTML = `<span class="pill ${kind}">${escapeHtml(text)}</span>`; }
-  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  function val(id){return $(id).value.trim()}
-  function protocol(){return val('transport') === 'ws' ? Photon.ConnectionProtocol.Ws : Photon.ConnectionProtocol.Wss}
-  function stateName(s){
-    try { return Photon.LoadBalancing.LoadBalancingClient.StateToName(s); } catch(e) { return String(s); }
-  }
-  function clientInfo() {
-    if (!client) return;
-    try { $('state').textContent = stateName(client.state()); } catch(e) {}
-    try { $('ns').textContent = client.getNameServerAddress() || '—'; } catch(e) {}
-    try { $('master').textContent = client.getMasterServerAddress() || '—'; } catch(e) {}
-    try { $('rtt').textContent = client.getRtt() + ' ms'; } catch(e) {}
-    try { $('currentRoom').textContent = client.isJoinedToRoom() && client.myRoom() ? client.myRoom().name : '—'; } catch(e) {}
-    try { $('players').textContent = client.isJoinedToRoom() ? client.myRoomActorCount() : '—'; } catch(e) {}
-    try { $('currentRegion').textContent = client.myRoom()?.region || $('region').value || '—'; } catch(e) { $('currentRegion').textContent = $('region').value || '—'; }
-  }
-  function env() {
-    const rows = [
-      ['URL', location.href], ['Origin', location.origin], ['Protocol', location.protocol],
-      ['WebSocket', typeof WebSocket !== 'undefined' ? '可用' : '不可用'],
-      ['Secure Context', window.isSecureContext ? '是' : '否（WSS 通常仍可由 HTTPS 页面正常使用；file:// 情况需特别留意）'],
-      ['Online', navigator.onLine ? '在线' : '离线'],
-      ['User Agent', navigator.userAgent]
-    ];
-    $('env').innerHTML = rows.map(r=>`<div class="kv"><div class="k">${escapeHtml(r[0])}</div><div class="v">${escapeHtml(r[1])}</div></div>`).join('');
-  }
+        // ==================== 全局状态 ====================
+        let room = null;             // Trystero room 对象（后续使用）
+        let currentRoomCode = '';
+        let myPeerId = selfId;
+        let players = new Map();     // peerId -> {name, color}
+        let isHost = false;
+        let isJoining = false;
+        let intentionalLeave = false;
+        let connectionCheckTimer = null;
 
-  function wireClient() {
-    const LB = Photon.LoadBalancing.LoadBalancingClient;
-    client = new LB(protocol(), val('appId'), val('appVersion'));
-    // 故意不调用 setLogLevel：不同 Photon Web SDK 构建的 LogLevel 导出不同，诊断页面不依赖它。
-    client.setUserId(val('userId') || ('test-' + Math.random().toString(36).slice(2,8)));
+        // ==================== 工具函数 ====================
+        function generateRoomCode() {
+            let result = '';
+            const bytes = new Uint8Array(ROOM_CODE_LENGTH);
+            crypto.getRandomValues(bytes);
+            for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
+                result += ROOM_CODE_CHARS[bytes[i] % ROOM_CODE_CHARS.length];
+            }
+            return result;
+        }
 
-    client.onStateChange = s => { $('state').textContent = stateName(s); log(`StateChange → ${stateName(s)} (${s})`, 'info'); clientInfo(); };
-    client.onError = (code,msg) => { log(`Client ERROR code=${code} msg=${msg}`, 'error'); setStatus('Photon 客户端错误', 'bad'); clientInfo(); };
-    client.onOperationResponse = (errorCode,errorMsg,code,content) => {
-      const text = `OperationResponse op=${code} error=${errorCode}${errorMsg ? ' / '+errorMsg : ''}`;
-      log(text, errorCode ? 'error' : 'info');
-      if (errorCode) log('响应内容: ' + safeJson(content), 'warning');
-      clientInfo();
-    };
-    client.onRoomList = rooms => { log(`收到 RoomList：${(rooms||[]).length} 个房间`, 'success'); clientInfo(); };
-    client.onRoomListUpdate = (rooms, updated, added, removed) => log(`RoomListUpdate：总计=${rooms?.length||0} 新增=${added?.length||0} 更新=${updated?.length||0} 移除=${removed?.length||0}`);
-    client.onActorJoin = actor => { log(`玩家进入：actorNr=${actor.actorNr} name=${actor.name}`, 'success'); clientInfo(); };
-    client.onActorLeave = (actor) => { log(`玩家离开：actorNr=${actor.actorNr} name=${actor.name}`, 'warning'); clientInfo(); };
-    client.onEvent = (code,content,actorNr) => { log(`收到 Event #${code} ← actor=${actorNr}: ${safeJson(content)}`, 'success'); $('eventInbox').textContent = `Event #${code} / actor ${actorNr}\n${safeJson(content)}`; };
-    client.onServerErrorInfo = info => log(`ServerErrorInfo: ${info}`, 'warning');
-    client.onAppStats = (ec,em,stats) => log(`AppStats peers=${stats?.peerCount} masterPeers=${stats?.masterPeerCount} games=${stats?.gameCount}`);
-    client.onGetRegionsResult = (ec,em,regions) => { log(`Region 列表返回 error=${ec} ${em||''}`, ec ? 'error':'success'); log('Regions: ' + safeJson(regions), ec?'error':'info'); };
-    client.onConnectedToMaster = () => { firstConnectAt ||= Date.now(); setStatus('已连接 Master', 'good'); log(`★ OnConnectedToMaster：耗时 ${Date.now()-firstConnectAt} ms`, 'success'); clientInfo(); };
-    client.onConnectedToNameServer = () => { log('★ OnConnectedToNameServer：Name Server 已连接，准备进入 Region Master', 'success'); clientInfo(); };
-    client.onCreatedRoom = () => { log(`★ OnCreatedRoom：${client.myRoom()?.name || 'unknown'}`, 'success'); clientInfo(); };
-    client.onJoinedRoom = () => { roomJoinedAt = Date.now(); setStatus('已进入 Room', 'good'); let r='—'; try{r=client.getRtt()+' ms'}catch(_){} log(`★ OnJoinedRoom：${client.myRoom()?.name || 'unknown'}；RTT=${r}`, 'success'); clientInfo(); };
-    client.onJoinRoomFailed = (code,msg) => log(`JoinRoomFailed code=${code} msg=${msg}`, 'error');
-    client.onCreateRoomFailed = (code,msg) => log(`CreateRoomFailed code=${code} msg=${msg}`, 'error');
-    client.onLeftRoom = () => { log('★ OnLeftRoom'); setStatus('已连接 Master', 'good'); clientInfo(); };
-  }
+        function sanitizeRoomId(input) {
+            return input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        }
 
-  function safeJson(x){ try{return JSON.stringify(x);}catch(e){return String(x)} }
+        function showToast(message, type = '') {
+            toast.textContent = message;
+            toast.className = 'toast';
+            if (type) toast.classList.add(type);
+            void toast.offsetWidth;
+            toast.classList.add('show');
+            clearTimeout(toast._timeout);
+            toast._timeout = setTimeout(() => toast.classList.remove('show'), 2200);
+        }
 
-  async function connect() {
-    if (!val('appId')) return log('AppId 为空', 'error');
-    if (client) { try{client.disconnect()}catch(e){} client = null; }
-    $('userId').value = $('userId').value.replace(/^test-$/, 'test-' + Math.random().toString(36).slice(2,8));
-    log('----- 开始连接诊断 -----');
-    log(`AppId=${val('appId')}, AppVersion=${val('appVersion')}, Region=${val('region')}, Protocol=${val('transport')}`);
-    wireClient();
-    setStatus('连接中…', 'warn');
-    firstConnectAt = Date.now();
-    let ok = false;
-    try { ok = client.connectToRegionMaster(val('region')); log(`connectToRegionMaster(${val('region')}) 返回 ${ok}`, ok?'info':'error'); } catch(e) { log('调用 connectToRegionMaster 异常：'+(e.stack||e), 'error'); return; }
-    try { log('连接调用后立即状态='+stateName(client.state())+', isNameServer='+client.isConnectedToNameServer()+', isMaster='+client.isConnectedToMaster(), 'info'); } catch(e) {}
-    try { log('NameServerAddress='+client.getNameServerAddress()+' / MasterAddress='+client.getMasterServerAddress(), 'info'); } catch(e) {}
-    clientInfo();
-    if (!ok) log('Photon 客户端当前状态不允许发起连接；请先断开/重载后再试。', 'error');
-    setTimeout(() => {
-      if (!client) return;
-      const st = stateName(client.state());
-      if (!client.isConnectedToMaster() && st !== 'JoinedLobby' && st !== 'Joined') {
-        log(`⚠ 连接等待超过 12 秒：当前状态=${st}。这通常意味着 Name Server/WSS/Region/AppId 权限阶段没有完成，而不是 Room 本身的问题。`, 'warning');
-        try { log(`诊断地址：NameServer=${client.getNameServerAddress() || '—'}; Master=${client.getMasterServerAddress() || '—'}`, 'warning'); } catch(e) {}
-      }
-    }, 12000);
-  }
+        function setButtonLoading(btn, loading, loadingText = '请稍候...') {
+            const span = btn.querySelector('.btn-text');
+            if (loading) {
+                btn.disabled = true;
+                span.innerHTML = `<span class="btn-loading"></span>${loadingText}`;
+            } else {
+                btn.disabled = false;
+                if (btn.id === 'btn-create') span.textContent = '➕ 创建房间';
+                if (btn.id === 'btn-join') span.textContent = '🚪 加入房间';
+            }
+        }
 
-  function disconnect(){
-    if (!client) return log('当前没有 Photon 客户端实例', 'warning');
-    try{client.disconnect(); log('已请求 disconnect()');}catch(e){log('disconnect 异常：'+e,'error')}
-    setStatus('已断开'); clientInfo();
-  }
-  function roomTest(){
-    if (!client || !client.isConnectedToMaster()) return log('不能创建/加入房间：当前尚未连接 Master。', 'error');
-    const name = val('room');
-    if (!name) return log('Room Name 为空', 'error');
-    log(`开始房间测试：${name}`);
-    try {
-      const ret = client.createRoom(name, {isVisible:true,isOpen:true,maxPlayers:8,customGameProperties:{diag:1},propsListedInLobby:['diag']});
-      log(`createRoom(${name}) 返回 ${ret}`);
-      if (!ret) {
-        log('createRoom 没有发送；尝试 joinRoom。', 'warning');
-        const jr = client.joinRoom(name); log(`joinRoom(${name}) 返回 ${jr}`);
-      }
-    } catch(e) { log('createRoom/joinRoom 异常：'+e.stack,'error'); }
-  }
-  function leave(){ if(!client?.isJoinedToRoom()) return log('当前不在 Room','warning'); try{client.leaveRoom();log('已请求 leaveRoom()')}catch(e){log('leaveRoom 异常：'+e,'error')} }
-  function ping(){
-    if(!client) return log('还没有连接','warning');
-    try {
-      if (typeof client.updateRtt === 'function') {
-        client.updateRtt();
-        setTimeout(()=>{ clientInfo(); log(`RTT=${client.getRtt()} ms（Photon updateRtt）`,'success'); }, 700);
-      } else if (typeof client.getRtt === 'function') {
-        log(`当前 SDK 没有 updateRtt()；直接读取缓存 RTT=${client.getRtt()} ms。页面已识别为旧版 SDK。`,'warning');
-      } else {
-        log('当前 SDK 同时缺少 updateRtt/getRtt，无法进行 RTT 测量。','error');
-      }
-    } catch(e){log('RTT 测量异常：'+(e.stack||e),'error')}
-  }
-  function event(){
-    if(!client?.isJoinedToRoom()) return log('不能发送 Event：当前不在 Room。','error');
-    const content={text:val('eventText'),from:val('userId'),ts:Date.now()};
-    try{const ret=client.raiseEvent(1,content,{receivers:Photon.LoadBalancing.Constants.ReceiverGroup.Others});log('发送 Event #1：'+safeJson(content)+'；返回 '+ret, ret?'success':'error')}catch(e){log('raiseEvent 异常：'+e.stack,'error')}
-  }
-  function regionList(){
-    if(!client){ wireClient(); }
-    try {
-      if (client.isConnectedToNameServer && client.isConnectedToNameServer()) {
-        client.getRegions();
-        log('已在 Name Server，直接请求 getRegions()');
-      } else {
-        const ok=client.connectToNameServer();
-        log('connectToNameServer() 返回 '+ok);
-        setStatus('连接 Name Server…','warn');
-        setTimeout(()=>{
-          try {
-            if(client.isConnectedToNameServer && client.isConnectedToNameServer()){ client.getRegions(); log('Name Server 已连接，已请求 getRegions()'); }
-            else log('1200ms 后仍未连接 Name Server，getRegions() 不发送。','warning');
-          } catch(e){log('getRegions 异常：'+(e.stack||e),'error')}
-        },1200);
-      }
-    }catch(e){log('NameServer 连接异常：'+(e.stack||e),'error')}
-  }
-  function clearLog(){logEl.innerHTML='';}
-  function exportLog(){
-    const text = [...logEl.querySelectorAll('.line')].map(x=>x.textContent).join('\n');
-    const meta = `Photon Realtime Diagnostic
-Build=2026.08.15-02\nTime=${new Date().toISOString()}\nAppId=${val('appId')}\nRegion=${val('region')}\nProtocol=${val('transport')}\nRoom=${val('room')}\nUserAgent=${navigator.userAgent}\n\n`;
-    const blob=new Blob([meta+text],{type:'text/plain;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='photon-diagnostic-'+Date.now()+'.txt'; a.click(); URL.revokeObjectURL(a.href);
-  }
-  async function autoDiag(){
-    log('===== 自动诊断开始 =====');
-    env();
-    if(typeof Photon==='undefined'){log('❌ Photon SDK 没有加载。检查 CDN/网络，或把 SDK 本地文件放在页面中。','error');return}
-    log('✓ Photon SDK 已加载，Version='+ (Photon.Version || 'unknown'),'success');
-    try { const L = Photon.LoadBalancing.LoadBalancingClient; log('SDK API: connectToRegionMaster=' + (typeof L.prototype.connectToRegionMaster) + ', getRtt=' + (typeof L.prototype.getRtt) + ', updateRtt=' + (typeof L.prototype.updateRtt) + ', createRoom=' + (typeof L.prototype.createRoom) + ', joinRoom=' + (typeof L.prototype.joinRoom) + ', raiseEvent=' + (typeof L.prototype.raiseEvent) + ', connectToNameServer=' + (typeof L.prototype.connectToNameServer), 'info'); } catch(e) { log('SDK API 检测异常: '+e, 'warning'); }
-    log('✓ WebSocket='+(typeof WebSocket!=='undefined')+' / online='+navigator.onLine,'success');
-    await connect();
-    setTimeout(()=>{if(client?.isConnectedToMaster()){log('✓ Master 阶段通过，继续房间测试。','success');roomTest();}else log('⚠ 还没有进入 Master；请看前面的 StateChange / Client ERROR / OperationResponse。','warning')},3500);
-  }
+        function showScreen(screen) {
+            homeScreen.classList.toggle('active', screen === 'home');
+            roomScreen.classList.toggle('active', screen === 'room');
+        }
 
-  $('connectBtn').onclick=connect; $('disconnectBtn').onclick=disconnect; $('roomBtn').onclick=roomTest; $('leaveBtn').onclick=leave; $('pingBtn').onclick=ping; $('eventBtn').onclick=event; $('eventBtn2').onclick=event; $('rttBtn2').onclick=ping; $('regionBtn').onclick=regionList; $('clearBtn').onclick=clearLog; $('exportBtn').onclick=exportLog; $('autoBtn').onclick=autoDiag;
-  env();
-  if(typeof Photon!=='undefined') $('sdk').textContent='已加载：'+(Photon.Version || 'Photon JavaScript SDK'); else $('sdk').textContent='加载失败：Photon 全局对象不存在';
-  log('诊断页已启动。BUILD=2026.08.15-02；SDK=photon-realtime@4.4.0；连接流程按官方 onStateChange/connectToRegionMaster 示例。若看到旧 DEBUG 报错，说明 GitHub Pages/浏览器仍缓存旧 HTML。');
-  if(location.protocol==='file:') log('当前页面是 file://。如果 Photon 因浏览器安全策略加载/连接异常，请将此 HTML 放到 HTTP(S) 静态服务器再测试。','warning');
-})();
-</script>
+        function updateConnectionStatus(mode, text) {
+            statusDot.className = 'status-dot';
+            if (mode === 'connecting') statusDot.classList.add('connecting');
+            else if (mode === 'online') statusDot.classList.add('online');
+            else if (mode === 'offline') statusDot.classList.add('offline');
+            statusText.textContent = text;
+        }
+
+        function updatePlayerList() {
+            playerList.innerHTML = '';
+            const sorted = Array.from(players.entries());
+            // 先显示自己，再显示其他玩家
+            sorted.sort((a, b) => {
+                if (a[0] === myPeerId) return -1;
+                if (b[0] === myPeerId) return 1;
+                return 0;
+            });
+            for (const [peerId, data] of sorted) {
+                const div = document.createElement('div');
+                div.className = 'player-item';
+                const avatarColor = data.color || '#5b8def';
+                div.innerHTML = `
+                    <div class="player-avatar" style="background:${avatarColor};">${(data.name || '?').charAt(0)}</div>
+                    <span class="player-name">${data.name || '未知玩家'}</span>
+                    <span class="player-badge">${peerId === myPeerId ? '你' : ''}</span>
+                `;
+                playerList.appendChild(div);
+            }
+            peerCount.textContent = players.size;
+        }
+
+        function upsertPlayer(peerId, name, color) {
+            if (!players.has(peerId)) {
+                players.set(peerId, { name: name || '玩家-' + peerId.substring(0,4), color: color || '#5b8def' });
+            } else {
+                const p = players.get(peerId);
+                if (name) p.name = name;
+                if (color) p.color = color;
+            }
+            updatePlayerList();
+        }
+
+        function removePlayer(peerId) {
+            players.delete(peerId);
+            updatePlayerList();
+        }
+
+        // ==================== Supabase 房间操作 ====================
+        async function createRoomInSupabase(roomCode, hostPeerId) {
+            const { data, error } = await supabase
+                .from('rooms')
+                .insert([
+                    {
+                        room_code: roomCode,
+                        host_peer_id: hostPeerId,
+                        status: 'waiting',
+                        current_players: 1,
+                        max_players: 8,
+                        player_order: [hostPeerId],
+                        game_state: {},
+                        expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+                    }
+                ])
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        }
+
+        async function checkRoomExists(roomCode) {
+            const now = new Date().toISOString();
+            const { data, error } = await supabase
+                .from('rooms')
+                .select('room_code, status, current_players, max_players, player_order')
+                .eq('room_code', roomCode.toUpperCase())
+                .gt('expires_at', now)
+                .maybeSingle();
+            if (error) throw error;
+            return data;
+        }
+
+        async function updatePlayerListInSupabase(roomCode, playerOrder, currentPlayers) {
+            const { error } = await supabase
+                .from('rooms')
+                .update({ player_order: playerOrder, current_players: currentPlayers, updated_at: new Date() })
+                .eq('room_code', roomCode);
+            if (error) console.error('更新玩家列表失败:', error);
+        }
+
+        async function closeRoomInSupabase(roomCode) {
+            const { error } = await supabase
+                .from('rooms')
+                .update({ status: 'closed', closed_at: new Date(), updated_at: new Date() })
+                .eq('room_code', roomCode);
+            if (error) console.error('关闭房间失败:', error);
+        }
+
+        // ==================== Trystero 房间连接（占位，后续扩展） ====================
+        async function connectToTrysteroRoom(roomCode) {
+            try {
+                room = joinRoom({ appId: APP_ID }, roomCode);
+                // 设置事件监听（后续游戏逻辑在这里）
+                room.onPeerJoin((peerId) => {
+                    console.log('玩家加入 P2P:', peerId);
+                    upsertPlayer(peerId, '玩家-' + peerId.substring(0,4), '#e17055');
+                    showToast('新玩家加入', 'success');
+                    // 更新 Supabase 中的玩家列表
+                    const currentPlayers = players.size;
+                    const playerOrder = Array.from(players.keys());
+                    updatePlayerListInSupabase(currentRoomCode, playerOrder, currentPlayers);
+                });
+
+                room.onPeerLeave((peerId) => {
+                    console.log('玩家离开 P2P:', peerId);
+                    removePlayer(peerId);
+                    showToast('玩家离开', 'info');
+                    const currentPlayers = players.size;
+                    const playerOrder = Array.from(players.keys());
+                    updatePlayerListInSupabase(currentRoomCode, playerOrder, currentPlayers);
+                });
+
+                // 添加自己
+                upsertPlayer(myPeerId, '我', '#5b8def');
+                updateConnectionStatus('online', '已连接');
+                return room;
+            } catch (err) {
+                console.error('Trystero 连接失败:', err);
+                throw err;
+            }
+        }
+
+        // ==================== 创建房间流程 ====================
+        async function handleCreateRoom() {
+            if (isJoining) return;
+            homeError.textContent = '';
+            setButtonLoading(btnCreate, true, '创建中...');
+            isJoining = true;
+            intentionalLeave = false;
+
+            try {
+                // 生成房间码
+                const roomCode = generateRoomCode();
+                currentRoomCode = roomCode;
+                isHost = true;
+                players.clear();
+
+                // 插入 Supabase
+                await createRoomInSupabase(roomCode, myPeerId);
+                console.log('Supabase 房间记录创建成功');
+
+                // 连接 Trystero（暂未真正使用，但保留）
+                await connectToTrysteroRoom(roomCode);
+
+                // 更新 UI
+                roomCodeDisplay.textContent = roomCode;
+                showScreen('room');
+                updatePlayerList();
+                showToast('✅ 房间创建成功', 'success');
+                waitingHint.textContent = '等待其他玩家加入...';
+
+                // 启动连接检查（简单轮询）
+                startConnectionCheck();
+
+            } catch (err) {
+                console.error('创建房间失败:', err);
+                homeError.textContent = '创建失败，请检查网络或重试';
+                showToast('❌ 创建房间失败', 'error');
+                // 清理可能已创建的 Supabase 记录（如果已经插入但 Trystero 失败）
+                if (currentRoomCode) {
+                    await closeRoomInSupabase(currentRoomCode).catch(() => {});
+                }
+            } finally {
+                setButtonLoading(btnCreate, false);
+                isJoining = false;
+            }
+        }
+
+        // ==================== 加入房间流程 ====================
+        async function handleJoinRoom() {
+            if (isJoining) return;
+            const rawCode = sanitizeRoomId(roomIdInput.value);
+            if (rawCode.length !== ROOM_CODE_LENGTH) {
+                homeError.textContent = '请输入6位房间码';
+                roomIdInput.focus();
+                return;
+            }
+            homeError.textContent = '';
+            setButtonLoading(btnJoin, true, '加入中...');
+            isJoining = true;
+            intentionalLeave = false;
+
+            try {
+                // 检查 Supabase 中是否存在
+                const roomData = await checkRoomExists(rawCode);
+                if (!roomData) {
+                    homeError.textContent = '房间不存在或已过期';
+                    showToast('❌ 房间不存在', 'error');
+                    return;
+                }
+                if (roomData.status !== 'waiting') {
+                    homeError.textContent = '房间已开始游戏或已关闭';
+                    showToast('❌ 房间不可加入', 'error');
+                    return;
+                }
+                if (roomData.current_players >= roomData.max_players) {
+                    homeError.textContent = '房间已满';
+                    showToast('❌ 房间已满', 'error');
+                    return;
+                }
+
+                // 房间有效，准备加入
+                currentRoomCode = rawCode;
+                isHost = false;
+                players.clear();
+
+                // 连接 Trystero
+                await connectToTrysteroRoom(rawCode);
+
+                // 更新 Supabase 中的玩家列表（在 onPeerJoin 中也会更新）
+                // 这里先添加自己到本地
+                upsertPlayer(myPeerId, '我', '#5b8def');
+                updatePlayerList();
+                const playerOrder = Array.from(players.keys());
+                await updatePlayerListInSupabase(rawCode, playerOrder, players.size);
+
+                // 更新 UI
+                roomCodeDisplay.textContent = rawCode;
+                showScreen('room');
+                showToast('✅ 已加入房间', 'success');
+                waitingHint.textContent = '已加入，等待房主开始游戏...';
+
+                startConnectionCheck();
+
+            } catch (err) {
+                console.error('加入房间失败:', err);
+                homeError.textContent = '加入失败，请检查网络或稍后重试';
+                showToast('❌ 加入房间失败', 'error');
+            } finally {
+                setButtonLoading(btnJoin, false);
+                isJoining = false;
+            }
+        }
+
+        // ==================== 离开房间 ====================
+        async function leaveRoom() {
+            intentionalLeave = true;
+            stopConnectionCheck();
+            if (room) {
+                try { room.leave(); } catch (e) {}
+                room = null;
+            }
+            if (isHost && currentRoomCode) {
+                await closeRoomInSupabase(currentRoomCode);
+            } else if (currentRoomCode) {
+                // 非房主离开：从 player_order 中移除自己
+                try {
+                    const { data } = await supabase
+                        .from('rooms')
+                        .select('player_order, current_players')
+                        .eq('room_code', currentRoomCode)
+                        .maybeSingle();
+                    if (data && Array.isArray(data.player_order)) {
+                        const newOrder = data.player_order.filter(id => id !== myPeerId);
+                        await supabase
+                            .from('rooms')
+                            .update({ player_order: newOrder, current_players: newOrder.length, updated_at: new Date() })
+                            .eq('room_code', currentRoomCode);
+                    }
+                } catch (e) { console.error('离开更新失败:', e); }
+            }
+            players.clear();
+            currentRoomCode = '';
+            isHost = false;
+            roomCodeDisplay.textContent = '------';
+            showScreen('home');
+            showToast('已离开房间', 'info');
+        }
+
+        // ==================== 连接检查（简单版） ====================
+        function startConnectionCheck() {
+            stopConnectionCheck();
+            connectionCheckTimer = setInterval(() => {
+                if (!room || intentionalLeave) return;
+                // 简单示例：检查 P2P peers 数量（Trystero 可能提供 getPeers 方法）
+                // 这里仅作为占位
+                updateConnectionStatus('online', `${players.size - 1} 个连接`);
+            }, 5000);
+        }
+
+        function stopConnectionCheck() {
+            if (connectionCheckTimer) {
+                clearInterval(connectionCheckTimer);
+                connectionCheckTimer = null;
+            }
+        }
+
+        // ==================== 事件绑定 ====================
+        btnCreate.addEventListener('click', handleCreateRoom);
+        btnJoin.addEventListener('click', handleJoinRoom);
+        roomIdInput.addEventListener('input', () => {
+            roomIdInput.value = sanitizeRoomId(roomIdInput.value);
+            homeError.textContent = '';
+        });
+        roomIdInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); handleJoinRoom(); }
+        });
+        btnLeave.addEventListener('click', leaveRoom);
+        roomCodeCopy.addEventListener('click', async () => {
+            if (!currentRoomCode) return;
+            try {
+                await navigator.clipboard.writeText(currentRoomCode);
+                showToast('📋 房间码已复制', 'success');
+            } catch (err) {
+                // 降级方案
+                const textarea = document.createElement('textarea');
+                textarea.value = currentRoomCode;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('📋 房间码已复制', 'success');
+            }
+        });
+
+        // ==================== 初始化 ====================
+        function init() {
+            roomIdInput.placeholder = `例如: ${generateRoomCode()}`;
+            showScreen('home');
+            console.log('🐺 狼人杀房间系统已加载');
+            console.log('Supabase URL:', supabaseUrl);
+            console.log('我的 Peer ID:', myPeerId);
+        }
+        init();
+    </script>
 </body>
 </html>
