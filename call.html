@@ -255,6 +255,12 @@ function getSupportedAudioCapabilities(track) {
 
 function attachRemoteAudio(stream, peerId) {
   let item = state.peers.get(peerId) || { name: `设备 ${shortId(peerId)}` }
+  const audioTracks = stream.getAudioTracks()
+  const nextTrackId = audioTracks[0]?.id || ''
+  if (item.trackId && nextTrackId && item.trackId === nextTrackId) {
+    // 同一轨重复通知时不重新绑定，避免在移动端重新触发音频解码/播放状态。
+    return
+  }
   let audio = item.audio
 
   if (!audio) {
@@ -271,8 +277,15 @@ function attachRemoteAudio(stream, peerId) {
     document.body.appendChild(audio)
   }
 
-  audio.srcObject = stream
+  // 只挂载一个远端音频轨，避免异常情况下同一 MediaStream 携带多条音频轨产生叠音。
+  const tracks = stream.getAudioTracks()
+  if (!tracks.length) return
+  const incoming = new MediaStream([tracks[0]])
+  audio.srcObject = incoming
   audio.volume = AUDIO_CONFIG.outputVolume
+  item.streamId = stream.id
+  item.trackId = tracks[0].id
+  state.peers.set(peerId, item)
   upsertPeerCard(peerId, '通话已连接')
   audio.play().catch(() => {
     upsertPeerCard(peerId, '已连接，点一下页面开始播放')
@@ -423,15 +436,6 @@ async function join() {
     state.room = joinRoom(CONFIG, roomId)
     state.joined = true
 
-    state.room.onPeerJoin = peerId => {
-      log(`发现对方：${shortId(peerId)}`)
-      state.peers.set(peerId, {name: `设备 ${shortId(peerId)}`})
-      upsertPeerCard(peerId, '正在建立音频连接…')
-      // 发送给已经存在的对端，以及处理晚加入者
-      state.room.addStream(state.localStream, {target: peerId})
-      setTimeout(optimizePeerSenders, 120)
-    }
-
     state.room.onPeerLeave = peerId => {
       log(`对方离开：${shortId(peerId)}`)
       const item = state.peers.get(peerId)
@@ -455,19 +459,28 @@ async function join() {
       state.peers.set(peerId, {...old, name: data?.name || old.name || `设备 ${shortId(peerId)}`})
       upsertPeerCard(peerId, old.audio ? '通话已连接' : '正在连接…')
     }
-    state.room.onPeerJoin = ((original) => peerId => {
-      original?.(peerId)
+    // 只注册一次 onPeerJoin。Trystero 0.25.x 在重新赋值 onPeerJoin 时会立即回放当前已有 Peer，
+    // 因此不能先注册一个媒体处理器，再用包装函数重新赋值，否则已有 Peer 可能收到重复媒体。
+    state.room.onPeerJoin = peerId => {
+      log(`发现对方：${shortId(peerId)}`)
+      const existing = state.peers.get(peerId) || {}
+      state.peers.set(peerId, {
+        name: existing.name || `设备 ${shortId(peerId)}`,
+        audio: existing.audio
+      })
+      upsertPeerCard(peerId, '正在建立音频连接…')
+
+      // 已存在的 Peer 不在这里重复广播；新加入的 Peer 只定向发送一次。
+      state.room.addStream(state.localStream, {target: peerId})
       presence.send({name: state.displayName}, {target: peerId})
-    })(state.room.onPeerJoin)
+      setTimeout(optimizePeerSenders, 180)
+    }
 
-    // 关键：向当前房间所有已连接 peers 发自己的昵称。
-    setTimeout(() => presence.send({name: state.displayName}), 300)
-
-    // 初始音频流广播；新加入者由 onPeerJoin 定向发送。
+    // 房间中当前已经存在的 Peer，只做一次全量广播。
     state.room.addStream(state.localStream)
-    setTimeout(optimizePeerSenders, 250)
+    // 只在初始广播完成后优化一次发送器。
+    setTimeout(optimizePeerSenders, 300)
     startStatsLoop()
-    setTimeout(optimizePeerSenders, 500)
 
     $('joinView').classList.remove('active')
     $('callView').classList.add('active')
