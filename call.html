@@ -125,22 +125,28 @@ const CONFIG = {
   // password: 'your-shared-room-password'
 }
 
-// 可直接迁移到你的项目：所有语音链路相关参数集中在这里。
+// 语音链路：尽量遵循 Jitsi / LiveKit / 原生 WebRTC 的做法。
+// 关键原则：不要把“发送给 WebRTC 的麦克风流”再经过 Web Audio 重采样/压缩，
+// 否则浏览器原生 AEC 可能无法看到与扬声器播放一致的 render/reference 信号。
 const AUDIO_CONFIG = {
-  inputGain: 1.45,
-  compressorThreshold: -22,
-  compressorKnee: 18,
-  compressorRatio: 3.2,
-  compressorAttack: 0.008,
-  compressorRelease: 0.12,
-  outputGain: 1.75,
-  maxOutputGain: 2.5,
-  preferredBitrate: 64000,
+  // WebRTC 原生音频处理：AEC -> NS -> AGC，由浏览器的 WebRTC Audio Processing Module 负责。
   echoCancellation: true,
   noiseSuppression: true,
   autoGainControl: true,
   channelCount: 1,
-  sampleRate: 48000
+  sampleRate: 48000,
+  latency: 0.02,
+  // Chromium/现代浏览器支持时，进一步启用语音隔离；不支持时自动忽略。
+  voiceIsolation: true,
+
+  // Opus 语音编码。64 kbps 给语音足够余量，同时保留清晰度。
+  preferredBitrate: 64000,
+  lowBitrate: 32000,
+  adaptiveBitrate: true,
+  dtx: false,
+
+  // 播放端只使用原生 HTMLAudioElement 音量控制，不再经过 Web Audio 增益/压缩。
+  outputVolume: 1.0,
 }
 
 const $ = id => document.getElementById(id)
@@ -150,16 +156,10 @@ const state = {
   displayName: '访客',
   localStream: null,
   rawLocalStream: null,
-  audioContext: null,
-  micSource: null,
-  micGain: null,
-  highpass: null,
-  compressor: null,
-  localDestination: null,
   peers: new Map(),
   muted: false,
-  outputVolume: AUDIO_CONFIG.outputGain,
   joined: false,
+  statsTimer: null,
 }
 
 function setStatus(text, mode='') {
@@ -227,88 +227,52 @@ function removePeerCard(peerId) {
 }
 
 async function unlockAudio() {
-  if (state.audioContext?.state === 'suspended') {
-    try { await state.audioContext.resume() } catch (_) {}
-  }
   for (const item of state.peers.values()) {
-    if (item.audio) {
-      try { item.audio.muted = false; item.audio.playbackRate = 1; await item.audio.play() } catch (_) {}
-    }
-    if (item.gainNode) item.gainNode.gain.value = state.outputVolume
+    if (!item.audio) continue
+    try {
+      item.audio.muted = false
+      item.audio.volume = AUDIO_CONFIG.outputVolume
+      await item.audio.play()
+    } catch (_) {}
   }
 }
 
-function createProcessedMicStream(rawStream) {
-  const AudioCtx = window.AudioContext || window.webkitAudioContext
-  if (!AudioCtx) return rawStream
+function getSupportedAudioSettings(track) {
+  try {
+    return track.getSettings ? track.getSettings() : {}
+  } catch (_) {
+    return {}
+  }
+}
 
-  const ctx = new AudioCtx({ latencyHint: 'interactive', sampleRate: AUDIO_CONFIG.sampleRate })
-  const source = ctx.createMediaStreamSource(rawStream)
-  const hp = ctx.createBiquadFilter()
-  hp.type = 'highpass'
-  hp.frequency.value = 70
-  hp.Q.value = 0.7
-
-  const gain = ctx.createGain()
-  gain.gain.value = AUDIO_CONFIG.inputGain
-
-  const compressor = ctx.createDynamicsCompressor()
-  compressor.threshold.value = AUDIO_CONFIG.compressorThreshold
-  compressor.knee.value = AUDIO_CONFIG.compressorKnee
-  compressor.ratio.value = AUDIO_CONFIG.compressorRatio
-  compressor.attack.value = AUDIO_CONFIG.compressorAttack
-  compressor.release.value = AUDIO_CONFIG.compressorRelease
-
-  const destination = ctx.createMediaStreamDestination()
-  source.connect(hp).connect(gain).connect(compressor).connect(destination)
-
-  state.audioContext = ctx
-  state.micSource = source
-  state.highpass = hp
-  state.micGain = gain
-  state.compressor = compressor
-  state.localDestination = destination
-
-  return destination.stream
+function getSupportedAudioCapabilities(track) {
+  try {
+    return track.getCapabilities ? track.getCapabilities() : {}
+  } catch (_) {
+    return {}
+  }
 }
 
 function attachRemoteAudio(stream, peerId) {
   let item = state.peers.get(peerId) || { name: `设备 ${shortId(peerId)}` }
   let audio = item.audio
+
   if (!audio) {
-    audio = new Audio()
+    audio = document.createElement('audio')
     audio.autoplay = true
     audio.playsInline = true
     audio.preload = 'auto'
-    audio.volume = 1
+    audio.volume = AUDIO_CONFIG.outputVolume
     audio.setAttribute('aria-label', `来自 ${peerLabel(peerId)} 的音频`)
-
-    // 播放端不直接提高 HTMLAudioElement.volume，而是用 Web Audio 做可控增益 + 轻度压限。
-    const AudioCtx = window.AudioContext || window.webkitAudioContext
-    if (AudioCtx) {
-      try {
-        const ctx = state.audioContext || new AudioCtx({ latencyHint: 'interactive' })
-        if (!state.audioContext) state.audioContext = ctx
-        const source = ctx.createMediaElementSource(audio)
-        const gain = ctx.createGain()
-        gain.gain.value = state.outputVolume
-        const compressor = ctx.createDynamicsCompressor()
-        compressor.threshold.value = -18
-        compressor.knee.value = 16
-        compressor.ratio.value = 2.2
-        compressor.attack.value = 0.006
-        compressor.release.value = 0.16
-        source.connect(gain).connect(compressor).connect(ctx.destination)
-        item.gainNode = gain
-        item.outputCompressor = compressor
-      } catch (_) {}
-    }
-
+    audio.setAttribute('data-peer-id', peerId)
+    // 不把远端流再经过 Web Audio。保持原生媒体播放路径，让浏览器 AEC 能拿到完整 render/reference。
     item.audio = audio
     state.peers.set(peerId, item)
+    document.body.appendChild(audio)
   }
+
   audio.srcObject = stream
-  if (item.gainNode) item.gainNode.gain.value = state.outputVolume
+  audio.volume = AUDIO_CONFIG.outputVolume
   upsertPeerCard(peerId, '通话已连接')
   audio.play().catch(() => {
     upsertPeerCard(peerId, '已连接，点一下页面开始播放')
@@ -317,34 +281,85 @@ function attachRemoteAudio(stream, peerId) {
 
 function optimizePeerSenders() {
   if (!state.room?.getPeers) return
+
   const peers = state.room.getPeers()
   for (const [peerId, pc] of Object.entries(peers)) {
     try {
       for (const sender of pc.getSenders()) {
+        if (sender.track?.kind !== 'audio') continue
+
+        // 让编码器明确把内容当成“语音”，有条件时提升语音内容的编码策略。
+        try { sender.track.contentHint = 'speech' } catch (_) {}
+
+        if (!sender.getParameters || !sender.setParameters) continue
+        const params = sender.getParameters()
+        if (!params.encodings?.length) params.encodings = [{}]
+
+        const encoding = params.encodings[0]
+        encoding.maxBitrate = AUDIO_CONFIG.preferredBitrate
+        // WebRTC/Twilio 的工程实践中关闭 Opus DTX 可避免部分设备在静音/背景噪声下出现细碎噪声。
+        encoding.dtx = AUDIO_CONFIG.dtx
+
+        sender.setParameters(params).catch(() => {})
+      }
+    } catch (_) {
+      // 浏览器不支持 setParameters 时维持 WebRTC 默认策略。
+    }
+  }
+}
+
+function adaptPeerBitrate() {
+  if (!AUDIO_CONFIG.adaptiveBitrate || !state.room?.getPeers) return
+  const peers = state.room.getPeers()
+
+  for (const [peerId, pc] of Object.entries(peers)) {
+    pc.getStats?.().then(stats => {
+      let packetsSent = 0
+      let packetsLost = 0
+      for (const r of stats.values()) {
+        if (r.type === 'outbound-rtp' && r.kind === 'audio') {
+          packetsSent += r.packetsSent || 0
+        } else if (r.type === 'remote-inbound-rtp' && r.kind === 'audio') {
+          packetsLost += r.packetsLost || 0
+        }
+      }
+
+      const total = packetsSent + packetsLost
+      if (!total) return
+      const loss = packetsLost / total
+      const target = loss > 0.05 ? AUDIO_CONFIG.lowBitrate : AUDIO_CONFIG.preferredBitrate
+
+      for (const sender of pc.getSenders()) {
         if (sender.track?.kind !== 'audio' || !sender.getParameters || !sender.setParameters) continue
         const params = sender.getParameters()
         if (!params.encodings?.length) params.encodings = [{}]
-        params.encodings[0].maxBitrate = AUDIO_CONFIG.preferredBitrate
-        params.encodings[0].dtx = false
-        sender.setParameters(params).catch(() => {})
+        if (params.encodings[0].maxBitrate !== target) {
+          params.encodings[0].maxBitrate = target
+          sender.setParameters(params).catch(() => {})
+        }
       }
-    } catch (_) {}
+    }).catch(() => {})
   }
+}
+
+function startStatsLoop() {
+  clearInterval(state.statsTimer)
+  state.statsTimer = setInterval(adaptPeerBitrate, 5000)
 }
 
 function stopAudioPipeline() {
   for (const item of state.peers.values()) {
-    try { item.audio?.pause(); item.audio.srcObject = null } catch (_) {}
+    try {
+      item.audio?.pause()
+      if (item.audio) {
+        item.audio.srcObject = null
+        item.audio.remove()
+      }
+    } catch (_) {}
   }
   state.peers.clear()
-  try { state.micSource?.disconnect() } catch (_) {}
-  try { state.audioContext?.close() } catch (_) {}
-  state.audioContext = null
-  state.micSource = null
-  state.micGain = null
-  state.highpass = null
-  state.compressor = null
-  state.localDestination = null
+  clearInterval(state.statsTimer)
+  state.statsTimer = null
 }
 
 async function join() {
@@ -370,19 +385,40 @@ async function join() {
   $('joinBtn').disabled = true
 
   try {
+    const audioConstraints = {
+      echoCancellation: AUDIO_CONFIG.echoCancellation,
+      noiseSuppression: AUDIO_CONFIG.noiseSuppression,
+      autoGainControl: AUDIO_CONFIG.autoGainControl,
+      channelCount: AUDIO_CONFIG.channelCount,
+      sampleRate: AUDIO_CONFIG.sampleRate,
+      sampleSize: 16,
+      latency: AUDIO_CONFIG.latency,
+    }
+
+    // voiceIsolation 是实验/扩展约束：支持时再请求，避免老浏览器因为 unknown constraint 失败。
+    const probe = navigator.mediaDevices.getSupportedConstraints?.() || {}
+    if (AUDIO_CONFIG.voiceIsolation && probe.voiceIsolation) {
+      audioConstraints.voiceIsolation = true
+    }
+
     state.rawLocalStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: { ideal: AUDIO_CONFIG.echoCancellation },
-        noiseSuppression: { ideal: AUDIO_CONFIG.noiseSuppression },
-        autoGainControl: { ideal: AUDIO_CONFIG.autoGainControl },
-        channelCount: { ideal: AUDIO_CONFIG.channelCount },
-        sampleRate: { ideal: AUDIO_CONFIG.sampleRate },
-        sampleSize: { ideal: 16 },
-        latency: { ideal: 0.02 },
-      },
+      audio: audioConstraints,
       video: false,
     })
-    state.localStream = createProcessedMicStream(state.rawLocalStream)
+
+    // 关键：直接把原始 getUserMedia 音频轨交给 WebRTC。
+    // 绝不先通过 MediaStreamAudioDestinationNode、GainNode、CompressorNode 重采样/处理，
+    // 这样浏览器的 AEC3 才能根据实际扬声器 render reference 稳定工作。
+    state.localStream = state.rawLocalStream
+
+    const localTrack = state.localStream.getAudioTracks()[0]
+    if (localTrack) {
+      try { localTrack.contentHint = 'speech' } catch (_) {}
+      const settings = getSupportedAudioSettings(localTrack)
+      const caps = getSupportedAudioCapabilities(localTrack)
+      log(`音频处理：AEC=${settings.echoCancellation ?? '?'} NS=${settings.noiseSuppression ?? '?'} AGC=${settings.autoGainControl ?? '?'}${settings.voiceIsolation != null ? ` VI=${settings.voiceIsolation}` : ''}`)
+      if (caps.echoCancellationType) log(`AEC 能力：${JSON.stringify(caps.echoCancellationType)}`)
+    }
 
     state.room = joinRoom(CONFIG, roomId)
     state.joined = true
@@ -393,6 +429,7 @@ async function join() {
       upsertPeerCard(peerId, '正在建立音频连接…')
       // 发送给已经存在的对端，以及处理晚加入者
       state.room.addStream(state.localStream, {target: peerId})
+      setTimeout(optimizePeerSenders, 120)
     }
 
     state.room.onPeerLeave = peerId => {
@@ -407,7 +444,7 @@ async function join() {
     state.room.onPeerStream = (stream, peerId) => {
       log(`收到对方音频：${shortId(peerId)}`)
       attachRemoteAudio(stream, peerId)
-      optimizePeerSenders()
+      setTimeout(optimizePeerSenders, 120)
     }
 
     // 用 Trystero action 做极轻量的昵称发现，不参与音频传输。
@@ -428,6 +465,8 @@ async function join() {
 
     // 初始音频流广播；新加入者由 onPeerJoin 定向发送。
     state.room.addStream(state.localStream)
+    setTimeout(optimizePeerSenders, 250)
+    startStatsLoop()
     setTimeout(optimizePeerSenders, 500)
 
     $('joinView').classList.remove('active')
@@ -518,6 +557,16 @@ window.addEventListener('click', unlockAudio, {passive:true})
 window.addEventListener('touchstart', unlockAudio, {passive:true})
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') unlockAudio() })
 window.addEventListener('pagehide', () => { try { state.room?.leave?.() } catch (_) {} })
+window.addEventListener('visibilitychange', () => {
+  if (!document.hidden) unlockAudio()
+})
+window.addEventListener('focus', unlockAudio, {passive:true})
+window.addEventListener('pageshow', unlockAudio, {passive:true})
+navigator.mediaDevices?.addEventListener?.('devicechange', () => {
+  // 设备切换后不重建媒体轨，避免破坏 AEC 状态；提示开发者当前设置。
+  const track = state.localStream?.getAudioTracks?.()[0]
+  if (track) log(`音频设备变化：${JSON.stringify(getSupportedAudioSettings(track))}`)
+})
 
 const params = new URLSearchParams(location.search)
 $('roomInput').value = params.get('room') || localStorage.getItem('p2p-call-room') || ''
