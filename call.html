@@ -19,6 +19,7 @@
   --danger:#ff5d67;
   --ok:#5ee69a;
   --shadow:0 20px 60px rgba(0,0,0,.35);
+  --warn:#ffc861;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--text);font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif}
@@ -84,6 +85,7 @@ input:focus{border-color:rgba(120,167,255,.55);box-shadow:0 0 0 3px rgba(120,167
       <div class="card">
         <div style="font-weight:800;font-size:14px">关于连接</div>
         <div class="note">本页使用 Trystero 进行房间发现与 WebRTC 建连。媒体流建立后由浏览器之间直接传输，并使用 WebRTC 的加密通道。</div>
+        <div class="note" style="margin-top:8px">语音链路默认启用回声消除、降噪、AGC，并对人声做轻度高通、增益和动态压缩，以改善手机扬声器通话时的音量与清晰度。</div>
       </div>
       <div class="footer">Trystero v0.25.x · Static HTML · 无需后端业务服务器</div>
     </section>
@@ -120,8 +122,25 @@ import { joinRoom, selfId } from 'https://esm.run/trystero@0.25.3'
 const APP_ID = 'blue-sky-p2p-call-2026'
 const CONFIG = {
   appId: APP_ID,
-  // 可按需填写共享密码；保持空值时，Trystero 会从 appId + room 生成会话加密密钥。
   // password: 'your-shared-room-password'
+}
+
+// 可直接迁移到你的项目：所有语音链路相关参数集中在这里。
+const AUDIO_CONFIG = {
+  inputGain: 1.45,
+  compressorThreshold: -22,
+  compressorKnee: 18,
+  compressorRatio: 3.2,
+  compressorAttack: 0.008,
+  compressorRelease: 0.12,
+  outputGain: 1.75,
+  maxOutputGain: 2.5,
+  preferredBitrate: 64000,
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+  channelCount: 1,
+  sampleRate: 48000
 }
 
 const $ = id => document.getElementById(id)
@@ -130,8 +149,16 @@ const state = {
   roomId: '',
   displayName: '访客',
   localStream: null,
+  rawLocalStream: null,
+  audioContext: null,
+  micSource: null,
+  micGain: null,
+  highpass: null,
+  compressor: null,
+  localDestination: null,
   peers: new Map(),
   muted: false,
+  outputVolume: AUDIO_CONFIG.outputGain,
   joined: false,
 }
 
@@ -200,18 +227,124 @@ function removePeerCard(peerId) {
 }
 
 async function unlockAudio() {
+  if (state.audioContext?.state === 'suspended') {
+    try { await state.audioContext.resume() } catch (_) {}
+  }
   for (const item of state.peers.values()) {
     if (item.audio) {
-      try { await item.audio.play() } catch (_) {}
+      try { item.audio.muted = false; item.audio.playbackRate = 1; await item.audio.play() } catch (_) {}
     }
+    if (item.gainNode) item.gainNode.gain.value = state.outputVolume
   }
 }
 
-function teardownAudio() {
+function createProcessedMicStream(rawStream) {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext
+  if (!AudioCtx) return rawStream
+
+  const ctx = new AudioCtx({ latencyHint: 'interactive', sampleRate: AUDIO_CONFIG.sampleRate })
+  const source = ctx.createMediaStreamSource(rawStream)
+  const hp = ctx.createBiquadFilter()
+  hp.type = 'highpass'
+  hp.frequency.value = 70
+  hp.Q.value = 0.7
+
+  const gain = ctx.createGain()
+  gain.gain.value = AUDIO_CONFIG.inputGain
+
+  const compressor = ctx.createDynamicsCompressor()
+  compressor.threshold.value = AUDIO_CONFIG.compressorThreshold
+  compressor.knee.value = AUDIO_CONFIG.compressorKnee
+  compressor.ratio.value = AUDIO_CONFIG.compressorRatio
+  compressor.attack.value = AUDIO_CONFIG.compressorAttack
+  compressor.release.value = AUDIO_CONFIG.compressorRelease
+
+  const destination = ctx.createMediaStreamDestination()
+  source.connect(hp).connect(gain).connect(compressor).connect(destination)
+
+  state.audioContext = ctx
+  state.micSource = source
+  state.highpass = hp
+  state.micGain = gain
+  state.compressor = compressor
+  state.localDestination = destination
+
+  return destination.stream
+}
+
+function attachRemoteAudio(stream, peerId) {
+  let item = state.peers.get(peerId) || { name: `设备 ${shortId(peerId)}` }
+  let audio = item.audio
+  if (!audio) {
+    audio = new Audio()
+    audio.autoplay = true
+    audio.playsInline = true
+    audio.preload = 'auto'
+    audio.volume = 1
+    audio.setAttribute('aria-label', `来自 ${peerLabel(peerId)} 的音频`)
+
+    // 播放端不直接提高 HTMLAudioElement.volume，而是用 Web Audio 做可控增益 + 轻度压限。
+    const AudioCtx = window.AudioContext || window.webkitAudioContext
+    if (AudioCtx) {
+      try {
+        const ctx = state.audioContext || new AudioCtx({ latencyHint: 'interactive' })
+        if (!state.audioContext) state.audioContext = ctx
+        const source = ctx.createMediaElementSource(audio)
+        const gain = ctx.createGain()
+        gain.gain.value = state.outputVolume
+        const compressor = ctx.createDynamicsCompressor()
+        compressor.threshold.value = -18
+        compressor.knee.value = 16
+        compressor.ratio.value = 2.2
+        compressor.attack.value = 0.006
+        compressor.release.value = 0.16
+        source.connect(gain).connect(compressor).connect(ctx.destination)
+        item.gainNode = gain
+        item.outputCompressor = compressor
+      } catch (_) {}
+    }
+
+    item.audio = audio
+    state.peers.set(peerId, item)
+  }
+  audio.srcObject = stream
+  if (item.gainNode) item.gainNode.gain.value = state.outputVolume
+  upsertPeerCard(peerId, '通话已连接')
+  audio.play().catch(() => {
+    upsertPeerCard(peerId, '已连接，点一下页面开始播放')
+  })
+}
+
+function optimizePeerSenders() {
+  if (!state.room?.getPeers) return
+  const peers = state.room.getPeers()
+  for (const [peerId, pc] of Object.entries(peers)) {
+    try {
+      for (const sender of pc.getSenders()) {
+        if (sender.track?.kind !== 'audio' || !sender.getParameters || !sender.setParameters) continue
+        const params = sender.getParameters()
+        if (!params.encodings?.length) params.encodings = [{}]
+        params.encodings[0].maxBitrate = AUDIO_CONFIG.preferredBitrate
+        params.encodings[0].dtx = false
+        sender.setParameters(params).catch(() => {})
+      }
+    } catch (_) {}
+  }
+}
+
+function stopAudioPipeline() {
   for (const item of state.peers.values()) {
-    try { item.audio.pause(); item.audio.srcObject = null } catch (_) {}
+    try { item.audio?.pause(); item.audio.srcObject = null } catch (_) {}
   }
   state.peers.clear()
+  try { state.micSource?.disconnect() } catch (_) {}
+  try { state.audioContext?.close() } catch (_) {}
+  state.audioContext = null
+  state.micSource = null
+  state.micGain = null
+  state.highpass = null
+  state.compressor = null
+  state.localDestination = null
 }
 
 async function join() {
@@ -237,15 +370,19 @@ async function join() {
   $('joinBtn').disabled = true
 
   try {
-    state.localStream = await navigator.mediaDevices.getUserMedia({
+    state.rawLocalStream = await navigator.mediaDevices.getUserMedia({
       audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        channelCount: 1,
+        echoCancellation: { ideal: AUDIO_CONFIG.echoCancellation },
+        noiseSuppression: { ideal: AUDIO_CONFIG.noiseSuppression },
+        autoGainControl: { ideal: AUDIO_CONFIG.autoGainControl },
+        channelCount: { ideal: AUDIO_CONFIG.channelCount },
+        sampleRate: { ideal: AUDIO_CONFIG.sampleRate },
+        sampleSize: { ideal: 16 },
+        latency: { ideal: 0.02 },
       },
       video: false,
     })
+    state.localStream = createProcessedMicStream(state.rawLocalStream)
 
     state.room = joinRoom(CONFIG, roomId)
     state.joined = true
@@ -269,22 +406,8 @@ async function join() {
 
     state.room.onPeerStream = (stream, peerId) => {
       log(`收到对方音频：${shortId(peerId)}`)
-      let item = state.peers.get(peerId) || {name: `设备 ${shortId(peerId)}`}
-      let audio = item.audio
-      if (!audio) {
-        audio = new Audio()
-        audio.autoplay = true
-        audio.playsInline = true
-        audio.volume = 1
-        audio.setAttribute('aria-label', `来自 ${peerLabel(peerId)} 的音频`)
-        item.audio = audio
-        state.peers.set(peerId, item)
-      }
-      audio.srcObject = stream
-      upsertPeerCard(peerId, '通话已连接')
-      audio.play().catch(() => {
-        upsertPeerCard(peerId, '已连接，点一下页面开始播放')
-      })
+      attachRemoteAudio(stream, peerId)
+      optimizePeerSenders()
     }
 
     // 用 Trystero action 做极轻量的昵称发现，不参与音频传输。
@@ -305,6 +428,7 @@ async function join() {
 
     // 初始音频流广播；新加入者由 onPeerJoin 定向发送。
     state.room.addStream(state.localStream)
+    setTimeout(optimizePeerSenders, 500)
 
     $('joinView').classList.remove('active')
     $('callView').classList.add('active')
@@ -321,8 +445,11 @@ async function join() {
     console.error(error)
     state.joined = false
     state.room = null
+    stopAudioPipeline()
     state.localStream?.getTracks().forEach(t => t.stop())
+    state.rawLocalStream?.getTracks().forEach(t => t.stop())
     state.localStream = null
+    state.rawLocalStream = null
     $('joinBtn').disabled = false
     setStatus('连接失败', 'err')
     const msg = error?.name === 'NotAllowedError' ? '麦克风权限被拒绝' : `无法加入：${error?.message || error}`
@@ -340,9 +467,11 @@ function broadcastPresence() {
 async function hangup() {
   if (!state.joined) return
   try { state.room?.leave?.() } catch (_) {}
-  teardownAudio()
+  stopAudioPipeline()
   state.localStream?.getTracks().forEach(t => t.stop())
+  state.rawLocalStream?.getTracks().forEach(t => t.stop())
   state.localStream = null
+  state.rawLocalStream = null
   state.room = null
   state.presence = null
   state.joined = false
@@ -386,6 +515,8 @@ $('hangBtn').onclick = hangup
 $('muteBtn').onclick = toggleMute
 $('shareBtn').onclick = shareRoom
 window.addEventListener('click', unlockAudio, {passive:true})
+window.addEventListener('touchstart', unlockAudio, {passive:true})
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') unlockAudio() })
 window.addEventListener('pagehide', () => { try { state.room?.leave?.() } catch (_) {} })
 
 const params = new URLSearchParams(location.search)
