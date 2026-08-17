@@ -1,593 +1,1748 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#0b1020">
-<meta name="description" content="基于 Trystero + WebRTC 的 P2P 全双工语音通话">
-<title>P2P 全双工通话</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>音频连线 — P2P 语音通话</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- PeerJS CDN -->
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
 <style>
-:root{
-  --bg:#080c17;
-  --panel:rgba(18,25,43,.78);
-  --panel-2:rgba(26,35,58,.72);
-  --line:rgba(255,255,255,.09);
-  --text:#f5f7fb;
-  --muted:#9da8bd;
-  --accent:#78a7ff;
-  --accent-2:#5c7cff;
-  --danger:#ff5d67;
-  --ok:#5ee69a;
-  --shadow:0 20px 60px rgba(0,0,0,.35);
-  --warn:#ffc861;
+/* THEME VARIABLES */
+:root {
+    --bg-base: #020205;
+    --surface: rgba(10, 12, 16, 0.72);
+    --surface-hover: rgba(0, 255, 65, 0.08);
+    --border: rgba(0, 255, 65, 0.3);
+    --border-highlight: rgba(0, 243, 255, 0.6);
+    --primary: #00ff41;
+    --primary-glow: rgba(0, 255, 65, 0.4);
+    --secondary: #00f3ff;
+    --secondary-glow: rgba(0, 243, 255, 0.4);
+    --danger: #ff0055;
+    --danger-glow: rgba(255, 0, 85, 0.4);
+    --warning: #ffb703;
+    --text-main: #f0fdf4;
+    --text-muted: #86a58d;
 }
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--text);font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif}
-body{overflow:hidden}
-button,input{font:inherit}
-.app{height:100dvh;display:flex;flex-direction:column;max-width:560px;margin:auto;position:relative;overflow:hidden;background:
- radial-gradient(circle at 50% -10%,rgba(92,124,255,.24),transparent 36%),
- linear-gradient(180deg,#0b1020 0%,#070a12 100%)}
-.topbar{padding:calc(12px + env(safe-area-inset-top)) 18px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);backdrop-filter:blur(20px);background:rgba(8,12,23,.56);z-index:5}
-.brand{display:flex;align-items:center;gap:10px}
-.logo{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#6b8cff,#3e58e8);box-shadow:0 10px 28px rgba(78,99,255,.3);font-size:19px}
-.title{font-size:15px;font-weight:800;letter-spacing:.3px}.sub{font-size:11px;color:var(--muted);margin-top:2px}
-.status{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:7px;white-space:nowrap}
-.dot{width:8px;height:8px;border-radius:50%;background:#606a7e;box-shadow:0 0 0 4px rgba(96,106,126,.12)}.dot.ok{background:var(--ok);box-shadow:0 0 0 4px rgba(94,230,154,.12)}.dot.err{background:var(--danger);box-shadow:0 0 0 4px rgba(255,93,103,.12)}
-.content{flex:1;overflow:auto;padding:18px 16px 26px;-webkit-overflow-scrolling:touch}
-.view{display:none}.view.active{display:block}
-.hero{padding:20px 4px 12px}.hero h1{font-size:30px;line-height:1.12;margin:0 0 8px;letter-spacing:-.8px}.hero p{margin:0;color:var(--muted);font-size:13px;line-height:1.65}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:16px;margin-top:14px;backdrop-filter:blur(18px)}
-.label{display:block;font-size:11px;color:var(--muted);margin:0 0 8px;font-weight:700;letter-spacing:.35px}
-input{width:100%;height:50px;padding:0 14px;border-radius:15px;border:1px solid var(--line);background:rgba(3,6,13,.48);color:var(--text);outline:none;font-size:15px}
-input:focus{border-color:rgba(120,167,255,.55);box-shadow:0 0 0 3px rgba(120,167,255,.10)}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
-.primary,.secondary,.danger,.iconbtn{border:0;cursor:pointer;touch-action:manipulation}
-.primary{width:100%;height:52px;border-radius:16px;color:white;background:linear-gradient(135deg,var(--accent),var(--accent-2));font-weight:800;box-shadow:0 12px 28px rgba(92,124,255,.25)}
-.secondary{height:48px;border-radius:15px;color:var(--text);background:rgba(255,255,255,.06);border:1px solid var(--line);font-weight:700}
-.danger{height:48px;border-radius:15px;color:white;background:rgba(255,93,103,.14);border:1px solid rgba(255,93,103,.24);font-weight:800}
-.note{font-size:11px;color:var(--muted);line-height:1.6;margin-top:10px}
-.roomHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}.roomTitle{font-size:20px;font-weight:900}.roomCode{font-size:12px;color:var(--muted);margin-top:4px}
-.me{display:flex;align-items:center;gap:12px;padding:14px;border-radius:18px;background:rgba(120,167,255,.08);border:1px solid rgba(120,167,255,.18)}
-.avatar{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(145deg,#5f7cff,#7a56d6);font-weight:900;font-size:18px;flex:0 0 auto}.who{min-width:0}.who strong{display:block;font-size:14px}.who span{display:block;margin-top:3px;color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.peerlist{margin-top:14px;display:flex;flex-direction:column;gap:10px}.peer{display:flex;align-items:center;gap:12px;padding:12px;border-radius:18px;background:var(--panel-2);border:1px solid var(--line)}.peer .avatar{width:42px;height:42px;border-radius:14px;font-size:16px}.peerinfo{min-width:0;flex:1}.peername{font-size:13px;font-weight:800}.peerstate{margin-top:3px;color:var(--muted);font-size:11px}.meter{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 5px rgba(94,230,154,.08)}
-.callControls{position:sticky;bottom:0;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px;padding-bottom:calc(2px + env(safe-area-inset-bottom))}
-.iconbtn{height:58px;border-radius:19px;background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--text);font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px}.iconbtn.active{background:rgba(120,167,255,.16);border-color:rgba(120,167,255,.34)}.iconbtn.hang{background:rgba(255,93,103,.13);border-color:rgba(255,93,103,.25);color:#ff9ea4}
-.empty{padding:25px 10px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6}
-.log{margin-top:14px;max-height:190px;overflow:auto;font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;color:#aeb9cd;background:rgba(0,0,0,.22);border-radius:16px;padding:11px;border:1px solid var(--line);white-space:pre-wrap}
-.footer{font-size:10px;color:#66738b;text-align:center;padding:12px 4px 0}.footer a{color:#8394b5}
-.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translate(-50%,18px);opacity:0;pointer-events:none;background:rgba(17,23,39,.96);border:1px solid var(--line);color:var(--text);padding:10px 14px;border-radius:13px;font-size:12px;z-index:30;transition:.22s ease;box-shadow:var(--shadow);max-width:calc(100vw - 28px);text-align:center}.toast.show{opacity:1;transform:translate(-50%,0)}
-.hidden{display:none!important}
-@media (min-width:700px){body{background:#03050b}.app{box-shadow:0 0 70px rgba(0,0,0,.45)}}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+}
+
+body {
+    background-color: var(--bg-base);
+    color: var(--text-main);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+#bg-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    mix-blend-mode: screen;
+    opacity: 0.85;
+}
+
+/* Glassmorphism Terminal Card */
+.terminal {
+    width: 100%;
+    max-width: 720px;
+    margin: auto;
+    background: var(--surface);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 
+        0 25px 50px -12px rgba(0,0,0,0.8),
+        0 0 0 1px rgba(255,255,255,0.05) inset,
+        0 0 30px var(--primary-glow);
+    position: relative;
+    z-index: 1;
+    transition: all 0.3s ease;
+}
+
+@media (max-width: 480px) {
+    .terminal {
+        padding: 20px;
+    }
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.header-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.header h1 {
+    color: var(--text-main);
+    font-size: 20px;
+    letter-spacing: 5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px var(--primary-glow);
+}
+
+.status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--primary);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--primary);
+    animation: pulse-dot 2s infinite;
+}
+
+.label {
+    display: block;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+input[type="text"], button {
+    width: 100%;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+input[type="text"] {
+    background: rgba(0,0,0,0.5);
+    border: 1px solid var(--border);
+    padding: 16px;
+    color: var(--primary);
+    margin-bottom: 16px;
+    outline: none;
+    font-size: 15px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+}
+
+input[type="text"]:focus {
+    border-color: var(--secondary);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5), 0 0 15px rgba(0, 243, 255, 0.2);
+}
+
+input[type="text"]::placeholder {
+    color: rgba(0, 255, 65, 0.25);
+}
+
+button {
+    background: rgba(0, 255, 65, 0.08);
+    border: 1px solid var(--primary);
+    color: var(--primary);
+    padding: 15px;
+    cursor: pointer;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-size: 13px;
+    user-select: none;
+}
+
+button:hover:not(:disabled) {
+    background: var(--primary);
+    color: #000;
+    box-shadow: 0 0 20px var(--primary-glow);
+    transform: translateY(-1px);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    border-color: var(--secondary);
+    color: var(--secondary);
+    background: rgba(0, 243, 255, 0.05);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: var(--secondary);
+    color: #000;
+    box-shadow: 0 0 20px var(--secondary-glow);
+}
+
+.btn-row {
+    display: flex;
+    gap: 12px;
+}
+
+@media (max-width: 480px) {
+    .btn-row {
+        flex-direction: column;
+    }
+}
+
+.copy-btn {
+    border: 1px dashed var(--text-muted);
+    color: var(--text-muted);
+    background: transparent;
+    padding: 10px 14px;
+    font-size: 12px;
+    margin-top: 8px;
+    letter-spacing: 1px;
+}
+
+.copy-btn:hover {
+    border-style: solid;
+    border-color: var(--secondary);
+    background: rgba(0, 243, 255, 0.1);
+    color: var(--secondary);
+    box-shadow: none;
+}
+
+.error-banner {
+    display: none;
+    background: rgba(255, 0, 85, 0.12);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.info-banner {
+    display: none;
+    background: rgba(0, 243, 255, 0.08);
+    border: 1px solid var(--secondary);
+    color: var(--secondary);
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+/* MODAL FOR INCOMING CALL */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal-card {
+    background: #080c10;
+    border: 1px solid var(--secondary);
+    border-radius: 16px;
+    padding: 28px;
+    width: 100%;
+    max-width: 440px;
+    text-align: center;
+    box-shadow: 0 0 35px var(--secondary-glow);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.modal-title {
+    font-size: 14px;
+    letter-spacing: 3px;
+    color: var(--secondary);
+    font-weight: 700;
+}
+
+.caller-display {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: 2px;
+}
+
+.pulse-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid var(--secondary);
+    box-shadow: 0 0 20px var(--secondary-glow);
+    animation: pulse-avatar 1.5s infinite;
+}
+
+.accept-btn {
+    background: var(--primary);
+    color: #000;
+    border: 1px solid var(--primary);
+}
+
+.accept-btn:hover {
+    box-shadow: 0 0 25px var(--primary-glow);
+}
+
+.decline-btn {
+    background: transparent;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+}
+
+.decline-btn:hover {
+    background: var(--danger);
+    color: #fff;
+    box-shadow: 0 0 25px var(--danger-glow);
+}
+
+/* OUTGOING CALL BANNER */
+.outgoing-box {
+    display: none;
+    background: rgba(0, 243, 255, 0.05);
+    border: 1px dashed var(--secondary);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.outgoing-text {
+    font-size: 13px;
+    color: var(--secondary);
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* CALL STAGE */
+#call-stage {
+    display: none;
+}
+
+.data-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.data-card {
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.data-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+}
+
+.data-value {
+    color: var(--secondary);
+    font-weight: 600;
+}
+
+.avatar-grid {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start;
+    margin: 28px 0;
+    padding: 20px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.04);
+}
+
+.avatar-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    max-width: 140px;
+}
+
+.avatar {
+    width: 86px;
+    height: 86px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    padding: 4px;
+    background: #000;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    transition: transform 0.3s ease;
+}
+
+.user-tag {
+    background: rgba(0, 255, 65, 0.1);
+    color: var(--primary);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid var(--border);
+    letter-spacing: 1px;
+}
+
+.ip-display {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    word-break: break-all;
+    line-height: 1.4;
+}
+
+.center-module {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-top: 15px; 
+}
+
+.call-timer {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary);
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px var(--primary-glow);
+}
+
+.connection-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dot {
+    width: 6px;
+    height: 6px;
+    background: var(--secondary);
+    border-radius: 50%;
+    animation: transfer 1s linear infinite;
+}
+
+.viz-box {
+    height: 80px;
+    width: 100%;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    background: rgba(0,0,0,0.45);
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 5px 20px rgba(0,0,0,0.5);
+}
+
+#viz-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.viz-muted-overlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.6);
+    color: var(--danger);
+    font-size: 12px;
+    letter-spacing: 2px;
+    font-weight: 700;
+}
+
+.controls-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+    background: rgba(0,0,0,0.25);
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.04);
+}
+
+@media (max-width: 480px) {
+    .controls-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+.range {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255,255,255,0.12);
+    height: 4px;
+    border-radius: 2px;
+    outline: none;
+}
+
+.range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+    box-shadow: 0 0 10px var(--primary);
+}
+
+.btn-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.btn-toggle-active {
+    background: var(--primary);
+    color: #000;
+    border-color: var(--primary);
+}
+
+.btn-toggle-inactive {
+    background: transparent;
+    color: var(--text-muted);
+    border-color: rgba(255,255,255,0.15);
+}
+
+.btn-muted-active {
+    background: var(--danger) !important;
+    color: #fff !important;
+    border-color: var(--danger) !important;
+    box-shadow: 0 0 20px var(--danger-glow);
+}
+
+.end-btn {
+    background: transparent;
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.end-btn:hover {
+    background: var(--danger);
+    color: #fff;
+    box-shadow: 0 0 20px var(--danger-glow);
+}
+
+/* KEY HINT */
+.shortcut-hint {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 12px;
+    letter-spacing: 1px;
+}
+
+kbd {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 10px;
+    color: var(--secondary);
+}
+
+/* KEYFRAMES */
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 10px var(--primary); }
+    50% { opacity: 0.3; box-shadow: 0 0 2px var(--primary); }
+}
+
+@keyframes pulse-avatar {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 15px var(--secondary-glow); }
+    50% { transform: scale(1.05); box-shadow: 0 0 25px var(--secondary); }
+}
+
+@keyframes transfer {
+    0% { transform: translateX(-10px); opacity: 0; }
+    50% { opacity: 1; }
+    100% { transform: translateX(10px); opacity: 0; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
 </style>
 </head>
+
 <body>
-<div class="app">
-  <header class="topbar">
-    <div class="brand"><div class="logo">☎</div><div><div class="title">P2P 全双工通话</div><div class="sub">Trystero · WebRTC</div></div></div>
-    <div class="status"><i id="statusDot" class="dot"></i><span id="statusText">未连接</span></div>
-  </header>
 
-  <main class="content">
-    <section id="joinView" class="view active">
-      <div class="hero"><h1>直接建立语音通话</h1><p>输入同一个房间号，与其他设备进行浏览器端 P2P 全双工语音通话。无需账号，通话音频不经过业务服务器中转。</p></div>
-      <div class="card">
-        <label class="label" for="roomInput">房间号</label>
-        <input id="roomInput" autocomplete="off" inputmode="text" maxlength="40" placeholder="例如：blue-sky-001">
-        <div class="row">
-          <button id="randomBtn" class="secondary">随机房间</button>
-          <button id="copyBtn" class="secondary">复制房间号</button>
+<canvas id="bg-canvas"></canvas>
+
+<!-- INCOMING CALL MODAL -->
+<div id="incoming-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+        <div class="modal-title">收到音频连线邀请</div>
+        <img id="incoming-avatar" class="pulse-avatar" alt="来电者头像">
+        <div id="incoming-caller-id" class="caller-display">呼叫方</div>
+        <div class="label" style="margin-bottom:0;">请求建立语音连接</div>
+        <div class="btn-row" style="width:100%; margin-top:8px;">
+            <button id="btn-accept" class="accept-btn">接受</button>
+            <button id="btn-decline" class="decline-btn">拒绝</button>
         </div>
-        <div style="margin-top:12px"><label class="label" for="nameInput">昵称（仅本机显示）</label><input id="nameInput" autocomplete="off" maxlength="20" placeholder="例如：寄语蓝天"></div>
-        <button id="joinBtn" class="primary" style="margin-top:14px">进入通话</button>
-        <div class="note">首次进入时浏览器会请求麦克风权限。建议使用 HTTPS 或 localhost；普通 HTTP 页面通常无法访问麦克风。</div>
-      </div>
-      <div class="card">
-        <div style="font-weight:800;font-size:14px">关于连接</div>
-        <div class="note">本页使用 Trystero 进行房间发现与 WebRTC 建连。媒体流建立后由浏览器之间直接传输，并使用 WebRTC 的加密通道。</div>
-        <div class="note" style="margin-top:8px">语音链路默认启用回声消除、降噪、AGC，并对人声做轻度高通、增益和动态压缩，以改善手机扬声器通话时的音量与清晰度。</div>
-      </div>
-      <div class="footer">Trystero v0.25.x · Static HTML · 无需后端业务服务器</div>
-    </section>
-
-    <section id="callView" class="view">
-      <div class="roomHeader">
-        <div><div class="roomTitle" id="roomTitle">通话中</div><div class="roomCode" id="roomCode"></div></div>
-        <button id="shareBtn" class="secondary" style="height:38px;padding:0 12px">分享</button>
-      </div>
-
-      <div class="me">
-        <div id="myAvatar" class="avatar">我</div>
-        <div class="who"><strong id="myName">我</strong><span id="myId">正在连接…</span></div>
-        <div id="myMeter" class="meter"></div>
-      </div>
-
-      <div id="peerList" class="peerlist">
-        <div id="emptyState" class="empty">等待其他人加入房间…<br>保持此页面打开即可。</div>
-      </div>
-
-      <div class="callControls">
-        <button id="muteBtn" class="iconbtn">🎙️ 静音</button>
-        <button id="hangBtn" class="iconbtn hang">📵 挂断</button>
-      </div>
-      <div id="log" class="log hidden"></div>
-    </section>
-  </main>
+    </div>
 </div>
-<div id="toast" class="toast"></div>
 
-<script type="module">
-import { joinRoom, selfId } from 'https://esm.run/trystero@0.25.3'
+<div class="terminal">
+    <div class="header">
+        <div class="header-title-group">
+            <h1>音频连线</h1>
+        </div>
+        <div class="status-badge">
+            <span id="system-status-text">待机</span>
+            <div class="status-dot" id="system-status"></div>
+        </div>
+    </div>
 
-const APP_ID = 'blue-sky-p2p-call-2026'
-const CONFIG = {
-  appId: APP_ID,
-  // password: 'your-shared-room-password'
-}
+    <!-- GLOBAL INFO BANNER -->
+    <div id="global-info" class="info-banner"></div>
 
-// 语音链路：尽量遵循 Jitsi / LiveKit / 原生 WebRTC 的做法。
-// 关键原则：不要把“发送给 WebRTC 的麦克风流”再经过 Web Audio 重采样/压缩，
-// 否则浏览器原生 AEC 可能无法看到与扬声器播放一致的 render/reference 信号。
-const AUDIO_CONFIG = {
-  // WebRTC 原生音频处理：AEC -> NS -> AGC，由浏览器的 WebRTC Audio Processing Module 负责。
-  echoCancellation: true,
-  noiseSuppression: true,
-  autoGainControl: true,
-  channelCount: 1,
-  sampleRate: 48000,
-  latency: 0.02,
-  // Chromium/现代浏览器支持时，进一步启用语音隔离；不支持时自动忽略。
-  voiceIsolation: true,
+    <!-- SETUP PHASE -->
+    <div id="setup-phase">
+        <span class="label">输入你的用户名</span>
+        <input type="text" id="username-input" placeholder="创建用户名（至少4个字符）" autocomplete="off" spellcheck="false" maxlength="24">
+        <div id="setup-error" class="error-banner"></div>
+        <button id="btn-init-uplink">初始化连接</button>
+    </div>
 
-  // Opus 语音编码。64 kbps 给语音足够余量，同时保留清晰度。
-  preferredBitrate: 64000,
-  lowBitrate: 32000,
-  adaptiveBitrate: true,
-  dtx: false,
+    <!-- LOBBY PHASE -->
+    <div id="call-controls" style="display:none;">
+        <div class="data-card" style="margin-bottom: 20px;">
+            <span class="label">你的用户名</span>
+            <div id="my-id" style="font-size:22px; color:var(--text-main); font-weight:700; letter-spacing:2px; word-break:break-all;">---</div>
+            <div class="btn-row" style="margin-top: 8px;">
+                <button id="btn-copy-id" class="copy-btn">复制用户名</button>
+                <button id="btn-copy-link" class="copy-btn">复制邀请链接</button>
+            </div>
+        </div>
 
-  // 播放端只使用原生 HTMLAudioElement 音量控制，不再经过 Web Audio 增益/压缩。
-  outputVolume: 1.0,
-}
+        <!-- Outgoing Call Status Box -->
+        <div id="outgoing-box" class="outgoing-box">
+            <div class="outgoing-text">
+                <div class="status-dot"></div>
+                <span>正在呼叫 <strong id="outgoing-target-name" style="color:var(--secondary);">---</strong>...</span>
+            </div>
+            <button id="btn-cancel-outgoing" class="copy-btn end-btn" style="margin-top:0;">取消呼叫</button>
+        </div>
 
-const $ = id => document.getElementById(id)
+        <span class="label">对方用户名</span>
+        <input type="text" id="peer-id" placeholder="输入或粘贴对方用户名" autocomplete="off" spellcheck="false" maxlength="24">
+        <div id="call-error" class="error-banner"></div>
+        <button id="btn-start-call">建立连接</button>
+    </div>
+
+    <!-- CALL ACTIVE STAGE -->
+    <div id="call-stage">
+        
+        <div class="data-grid">
+            <div class="data-card">
+                <span class="label" style="margin-bottom: 4px;">遥测数据</span>
+                <div class="data-row"><span>平均延迟</span> <span class="data-value" id="lat-avg">--</span></div>
+                <div class="data-row"><span>抖动</span> <span class="data-value" id="jitter">--</span></div>
+                <div class="data-row"><span>丢包</span> <span class="data-value" id="loss">0</span></div>
+                <div class="data-row"><span>通话质量</span> <span class="data-value" id="quality">--</span></div>
+            </div>
+            <div class="data-card">
+                <span class="label" style="margin-bottom: 4px;">路由信息</span>
+                <div class="data-row"><span>类型</span> <span class="data-value" id="network-type">---</span></div>
+                <div class="data-row"><span>路由</span> <span class="data-value" id="transport" style="font-size:11px;">---</span></div>
+            </div>
+        </div>
+
+        <div class="avatar-grid">
+            <!-- Left Side: Local -->
+            <div class="avatar-wrap">
+                <img id="my-avatar" class="avatar" alt="本地头像">
+                <span class="user-tag" id="local-user-tag">本地</span>
+                <span class="ip-display" id="local-ip">---</span>
+            </div>
+            
+            <!-- Center Module (Timer & Connection Line) -->
+            <div class="center-module">
+                <div id="call-timer" class="call-timer">00:00</div>
+                <div class="connection-line">
+                    <div class="dot" style="animation-delay: 0s;"></div>
+                    <div class="dot" style="animation-delay: 0.3s;"></div>
+                    <div class="dot" style="animation-delay: 0.6s;"></div>
+                </div>
+            </div>
+
+            <!-- Right Side: Remote -->
+            <div class="avatar-wrap">
+                <img id="peer-avatar" class="avatar" alt="对方头像">
+                <span class="user-tag" id="remote-user-tag" style="border-color:var(--secondary); color:var(--secondary); background:rgba(0,243,255,0.1);">对方</span>
+                <span class="ip-display" id="remote-ip">---</span>
+            </div>
+        </div>
+
+        <span class="label">麦克风强度</span>
+        <div class="viz-box">
+            <canvas id="viz-canvas"></canvas>
+            <div id="viz-muted-overlay" class="viz-muted-overlay">麦克风已静音</div>
+        </div>
+
+        <!-- Volume Controller -->
+        <div class="controls-row">
+            <span class="label" style="margin:0; min-width: 110px;">远端增益： <span id="gain-value" style="color:var(--primary); font-weight:bold;">1.0x</span></span>
+            <input type="range" id="gain-slider" class="range" min="0" max="300" value="100">
+            <span class="label" style="margin:0; min-width: 60px; text-align:right;" id="db-level">-- dB</span>
+        </div>
+
+        <!-- Real-Time Hardware Audio Processing & Mic Mute Buttons -->
+        <div class="btn-group">
+            <button id="btn-mute" class="btn-toggle-active">麦克风：开启</button>
+            <button id="btn-ns" class="btn-toggle-active">噪声抑制</button>
+            <button id="btn-ec" class="btn-toggle-active">回声消除</button>
+        </div>
+
+        <button id="btn-end-call" class="end-btn">结束通话</button>
+
+        <div class="shortcut-hint">
+            提示：按 <kbd>M</kbd> 切换静音 • 按 <kbd>Esc</kbd> 结束通话
+        </div>
+    </div>
+</div>
+
+<!-- Remote Audio Element (Muted so Web Audio API graph handles output without echo) -->
+<audio id="remote-audio" autoplay muted playsinline></audio>
+
+<script>
+/* =========================================================================
+   APPLICATION STATE & GLOBALS
+   ========================================================================= */
 const state = {
-  room: null,
-  roomId: '',
-  displayName: '访客',
-  localStream: null,
-  rawLocalStream: null,
-  peers: new Map(),
-  muted: false,
-  joined: false,
-  statsTimer: null,
-}
+    peer: null,
+    localStream: null,
+    currentCall: null,
+    incomingCallObj: null,
+    remoteAudioCtx: null,
+    localAudioCtx: null,
+    gainNode: null,
+    compressor: null,
+    remoteSource: null,
+    statsInterval: null,
+    latencyHistory: [],
+    vizAnimationId: null,
+    callTimerInterval: null,
+    callStartTime: 0,
+    isNsOn: true,
+    isEcOn: true,
+    isMuted: false,
+    soundCtx: null,
+    ringInterval: null
+};
 
-function setStatus(text, mode='') {
-  $('statusText').textContent = text
-  $('statusDot').className = 'dot' + (mode ? ' ' + mode : '')
-}
-
-let toastTimer
-function toast(message) {
-  clearTimeout(toastTimer)
-  $('toast').textContent = message
-  $('toast').classList.add('show')
-  toastTimer = setTimeout(() => $('toast').classList.remove('show'), 2200)
-}
-
-function log(message) {
-  const line = `[${new Date().toLocaleTimeString()}] ${message}`
-  $('log').classList.remove('hidden')
-  $('log').textContent = (line + '\n' + $('log').textContent).slice(0, 4000)
-  console.log('[P2P]', message)
-}
-
-function randomRoom() {
-  const words = ['blue', 'sky', 'mist', 'star', 'moon', 'cloud', 'wind', 'river']
-  const word = words[Math.floor(Math.random() * words.length)]
-  return `${word}-${Math.random().toString(36).slice(2, 7)}`
-}
-
-function shortId(id='') { return id ? id.slice(0, 6) : '------' }
-function avatarText(name, id) {
-  const s = (name || '').trim()
-  return s ? s.slice(0, 1).toUpperCase() : shortId(id).slice(0, 1).toUpperCase()
-}
-
-function peerLabel(peerId) {
-  const item = state.peers.get(peerId)
-  return item?.name || `设备 ${shortId(peerId)}`
-}
-
-function upsertPeerCard(peerId, statusText='已连接') {
-  $('emptyState')?.remove()
-  let row = document.getElementById(`peer-${peerId}`)
-  if (!row) {
-    row = document.createElement('div')
-    row.className = 'peer'
-    row.id = `peer-${peerId}`
-    row.innerHTML = `<div class="avatar"></div><div class="peerinfo"><div class="peername"></div><div class="peerstate"></div></div><div class="meter"></div>`
-    $('peerList').appendChild(row)
-  }
-  const item = state.peers.get(peerId) || {}
-  row.querySelector('.avatar').textContent = avatarText(item.name, peerId)
-  row.querySelector('.peername').textContent = peerLabel(peerId)
-  row.querySelector('.peerstate').textContent = statusText
-}
-
-function removePeerCard(peerId) {
-  document.getElementById(`peer-${peerId}`)?.remove()
-  if (!$('peerList').children.length) {
-    const empty = document.createElement('div')
-    empty.id = 'emptyState'
-    empty.className = 'empty'
-    empty.innerHTML = '等待其他人加入房间…<br>保持此页面打开即可。'
-    $('peerList').appendChild(empty)
-  }
-}
-
-async function unlockAudio() {
-  for (const item of state.peers.values()) {
-    if (!item.audio) continue
-    try {
-      item.audio.muted = false
-      item.audio.volume = AUDIO_CONFIG.outputVolume
-      await item.audio.play()
-    } catch (_) {}
-  }
-}
-
-function getSupportedAudioSettings(track) {
-  try {
-    return track.getSettings ? track.getSettings() : {}
-  } catch (_) {
-    return {}
-  }
-}
-
-function getSupportedAudioCapabilities(track) {
-  try {
-    return track.getCapabilities ? track.getCapabilities() : {}
-  } catch (_) {
-    return {}
-  }
-}
-
-function attachRemoteAudio(stream, peerId) {
-  let item = state.peers.get(peerId) || { name: `设备 ${shortId(peerId)}` }
-  const audioTracks = stream.getAudioTracks()
-  const nextTrackId = audioTracks[0]?.id || ''
-  if (item.trackId && nextTrackId && item.trackId === nextTrackId) {
-    // 同一轨重复通知时不重新绑定，避免在移动端重新触发音频解码/播放状态。
-    return
-  }
-  let audio = item.audio
-
-  if (!audio) {
-    audio = document.createElement('audio')
-    audio.autoplay = true
-    audio.playsInline = true
-    audio.preload = 'auto'
-    audio.volume = AUDIO_CONFIG.outputVolume
-    audio.setAttribute('aria-label', `来自 ${peerLabel(peerId)} 的音频`)
-    audio.setAttribute('data-peer-id', peerId)
-    // 不把远端流再经过 Web Audio。保持原生媒体播放路径，让浏览器 AEC 能拿到完整 render/reference。
-    item.audio = audio
-    state.peers.set(peerId, item)
-    document.body.appendChild(audio)
-  }
-
-  // 只挂载一个远端音频轨，避免异常情况下同一 MediaStream 携带多条音频轨产生叠音。
-  const tracks = stream.getAudioTracks()
-  if (!tracks.length) return
-  const incoming = new MediaStream([tracks[0]])
-  audio.srcObject = incoming
-  audio.volume = AUDIO_CONFIG.outputVolume
-  item.streamId = stream.id
-  item.trackId = tracks[0].id
-  state.peers.set(peerId, item)
-  upsertPeerCard(peerId, '通话已连接')
-  audio.play().catch(() => {
-    upsertPeerCard(peerId, '已连接，点一下页面开始播放')
-  })
-}
-
-function optimizePeerSenders() {
-  if (!state.room?.getPeers) return
-
-  const peers = state.room.getPeers()
-  for (const [peerId, pc] of Object.entries(peers)) {
-    try {
-      for (const sender of pc.getSenders()) {
-        if (sender.track?.kind !== 'audio') continue
-
-        // 让编码器明确把内容当成“语音”，有条件时提升语音内容的编码策略。
-        try { sender.track.contentHint = 'speech' } catch (_) {}
-
-        if (!sender.getParameters || !sender.setParameters) continue
-        const params = sender.getParameters()
-        if (!params.encodings?.length) params.encodings = [{}]
-
-        const encoding = params.encodings[0]
-        encoding.maxBitrate = AUDIO_CONFIG.preferredBitrate
-        // WebRTC/Twilio 的工程实践中关闭 Opus DTX 可避免部分设备在静音/背景噪声下出现细碎噪声。
-        encoding.dtx = AUDIO_CONFIG.dtx
-
-        sender.setParameters(params).catch(() => {})
-      }
-    } catch (_) {
-      // 浏览器不支持 setParameters 时维持 WebRTC 默认策略。
+// Centralized Audio Constraints
+const audioConstraints = {
+    audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: false,
+        sampleRate: 48000,
+        channelCount: 1,
+        latency: 0.02
     }
-  }
+};
+
+/* =========================================================================
+   ZERO-ASSET SYNTHESIZED SOUND SYSTEM (Web Audio API)
+   ========================================================================= */
+function getSoundCtx() {
+    if (!state.soundCtx) {
+        state.soundCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (state.soundCtx.state === 'suspended') {
+        state.soundCtx.resume();
+    }
+    return state.soundCtx;
 }
 
-function adaptPeerBitrate() {
-  if (!AUDIO_CONFIG.adaptiveBitrate || !state.room?.getPeers) return
-  const peers = state.room.getPeers()
+function startRingTone(isIncoming = true) {
+    stopRingTone();
+    const playTone = () => {
+        try {
+            const ctx = getSoundCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            
+            const now = ctx.currentTime;
+            if (isIncoming) {
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.setValueAtTime(659.25, now + 0.15); // E5
+            } else {
+                osc.frequency.setValueAtTime(440, now); // A4
+                osc.frequency.setValueAtTime(480, now + 0.15);
+            }
+            
+            gain.gain.setValueAtTime(0.08, now);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
+            
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.38);
+        } catch(e) {}
+    };
 
-  for (const [peerId, pc] of Object.entries(peers)) {
-    pc.getStats?.().then(stats => {
-      let packetsSent = 0
-      let packetsLost = 0
-      for (const r of stats.values()) {
-        if (r.type === 'outbound-rtp' && r.kind === 'audio') {
-          packetsSent += r.packetsSent || 0
-        } else if (r.type === 'remote-inbound-rtp' && r.kind === 'audio') {
-          packetsLost += r.packetsLost || 0
+    playTone();
+    state.ringInterval = setInterval(playTone, isIncoming ? 1800 : 2500);
+}
+
+function stopRingTone() {
+    if (state.ringInterval) {
+        clearInterval(state.ringInterval);
+        state.ringInterval = null;
+    }
+}
+
+function playConnectChime() {
+    try {
+        const ctx = getSoundCtx();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.18);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.3);
+    } catch(e) {}
+}
+
+function playDisconnectTone() {
+    try {
+        const ctx = getSoundCtx();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(220, now + 0.22);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.25);
+    } catch(e) {}
+}
+
+function playMuteBeep(muted) {
+    try {
+        const ctx = getSoundCtx();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(muted ? 320 : 640, now);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.1);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.1);
+    } catch(e) {}
+}
+
+/* =========================================================================
+   MATRIX DIGITAL RAIN BACKGROUND
+   ========================================================================= */
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let w = canvas.width = window.innerWidth;
+let h = canvas.height = window.innerHeight;
+
+const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ'.split('');
+const fontSize = 16;
+let cols = Math.floor(w / fontSize);
+let drops = Array(cols).fill(1);
+let lastMatrixTime = 0;
+
+function matrixLoop(time) {
+    requestAnimationFrame(matrixLoop);
+    
+    if (time - lastMatrixTime < 50) return;
+    lastMatrixTime = time;
+
+    ctx.fillStyle = 'rgba(2, 2, 5, 0.12)'; 
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.font = `500 ${fontSize}px 'JetBrains Mono', monospace`;
+    ctx.fillStyle = '#00ff41'; 
+    ctx.shadowBlur = 0;        
+
+    for (let i = 0; i < drops.length; i++) {
+        const text = chars[Math.floor(Math.random() * chars.length)];
+        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+        if (drops[i] * fontSize > h && Math.random() > 0.975) {
+            drops[i] = 0;
         }
-      }
+        drops[i]++;
+    }
+}
+requestAnimationFrame(matrixLoop);
 
-      const total = packetsSent + packetsLost
-      if (!total) return
-      const loss = packetsLost / total
-      const target = loss > 0.05 ? AUDIO_CONFIG.lowBitrate : AUDIO_CONFIG.preferredBitrate
-
-      for (const sender of pc.getSenders()) {
-        if (sender.track?.kind !== 'audio' || !sender.getParameters || !sender.setParameters) continue
-        const params = sender.getParameters()
-        if (!params.encodings?.length) params.encodings = [{}]
-        if (params.encodings[0].maxBitrate !== target) {
-          params.encodings[0].maxBitrate = target
-          sender.setParameters(params).catch(() => {})
-        }
-      }
-    }).catch(() => {})
-  }
+/* =========================================================================
+   PEER INITIALIZATION & EVENT HANDLERS
+   ========================================================================= */
+function updateStatusBadge(text, color, pulse = true) {
+    const statusText = document.getElementById('system-status-text');
+    const statusDot = document.getElementById('system-status');
+    if (statusText) statusText.innerText = text;
+    if (statusDot) {
+        statusDot.style.background = color;
+        statusDot.style.boxShadow = `0 0 10px ${color}`;
+        statusDot.style.animation = pulse ? 'pulse-dot 2s infinite' : 'none';
+    }
 }
 
-function startStatsLoop() {
-  clearInterval(state.statsTimer)
-  state.statsTimer = setInterval(adaptPeerBitrate, 5000)
-}
+function initializePeer() {
+    const user = document.getElementById('username-input').value.trim();
+    const errorBox = document.getElementById('setup-error');
 
-function stopAudioPipeline() {
-  for (const item of state.peers.values()) {
+    if (user.length < 4) {
+        showError(errorBox, "错误：用户名至少需要4个字符。");
+        return;
+    }
+
+    hideError(errorBox);
+    updateStatusBadge('初始化中', 'var(--warning)');
+
+    // Save username in localStorage
     try {
-      item.audio?.pause()
-      if (item.audio) {
-        item.audio.srcObject = null
-        item.audio.remove()
-      }
-    } catch (_) {}
-  }
-  state.peers.clear()
-  clearInterval(state.statsTimer)
-  state.statsTimer = null
+        localStorage.setItem('webrtc_p2p_username', user);
+    } catch(e) {}
+
+    if (state.peer) {
+        state.peer.destroy();
+    }
+
+    state.peer = new Peer(user, {
+        config: {
+            iceServers: [
+                { urls: 'stun:stun.cloudflare.com:3478' },
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        }
+    });
+
+    state.peer.on('open', (id) => {
+        document.getElementById('my-id').innerText = id;
+        document.getElementById('local-user-tag').innerText = id.substring(0, 10);
+        document.getElementById('setup-phase').style.display = 'none';
+        document.getElementById('call-controls').style.display = 'block';
+        
+        document.getElementById('my-avatar').src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(id)}&backgroundColor=000000`;
+        updateStatusBadge('在线', 'var(--primary)');
+        
+        // Auto-fill target if invite link URL query was provided
+        checkUrlInviteParams();
+    });
+
+    // INCOMING CALL HANDLER (With Accept/Decline Modal)
+    state.peer.on('call', (call) => {
+        // If already in an active call, busy/decline
+        if (state.currentCall) {
+            call.close();
+            return;
+        }
+
+        state.incomingCallObj = call;
+        showIncomingCallModal(call.peer);
+    });
+
+    state.peer.on('error', (err) => {
+        let errorMsg = "系统错误：" + err.type;
+        
+        if (err.type === 'peer-unavailable') {
+            errorMsg = "错误：对方用户名离线或不存在。";
+            cancelOutgoingCallUI();
+        } else if (err.type === 'network') {
+            errorMsg = "错误：网络连接丢失。";
+        } else if (err.type === 'browser-incompatible') {
+            errorMsg = "错误：你的浏览器不支持音频通话。";
+        } else if (err.type === 'unavailable-id') {
+            errorMsg = "错误：该用户名已被占用，请更换。";
+            document.getElementById('setup-phase').style.display = 'block';
+            document.getElementById('call-controls').style.display = 'none';
+        }
+
+        const isSetup = document.getElementById('setup-phase').style.display !== 'none';
+        const targetErrorBox = isSetup ? document.getElementById('setup-error') : document.getElementById('call-error');
+        showError(targetErrorBox, errorMsg);
+        
+        updateStatusBadge('错误', 'var(--danger)', false);
+    });
 }
 
-async function join() {
-  if (state.joined) return
-  if (!navigator.mediaDevices?.getUserMedia) {
-    toast('当前浏览器或环境不支持麦克风访问')
-    return
-  }
-
-  const roomId = $('roomInput').value.trim()
-  if (!roomId) {
-    toast('请输入房间号')
-    $('roomInput').focus()
-    return
-  }
-
-  state.roomId = roomId
-  state.displayName = $('nameInput').value.trim() || '访客'
-  localStorage.setItem('p2p-call-name', state.displayName)
-  localStorage.setItem('p2p-call-room', roomId)
-
-  setStatus('请求麦克风…')
-  $('joinBtn').disabled = true
-
-  try {
-    const audioConstraints = {
-      echoCancellation: AUDIO_CONFIG.echoCancellation,
-      noiseSuppression: AUDIO_CONFIG.noiseSuppression,
-      autoGainControl: AUDIO_CONFIG.autoGainControl,
-      channelCount: AUDIO_CONFIG.channelCount,
-      sampleRate: AUDIO_CONFIG.sampleRate,
-      sampleSize: 16,
-      latency: AUDIO_CONFIG.latency,
-    }
-
-    // voiceIsolation 是实验/扩展约束：支持时再请求，避免老浏览器因为 unknown constraint 失败。
-    const probe = navigator.mediaDevices.getSupportedConstraints?.() || {}
-    if (AUDIO_CONFIG.voiceIsolation && probe.voiceIsolation) {
-      audioConstraints.voiceIsolation = true
-    }
-
-    state.rawLocalStream = await navigator.mediaDevices.getUserMedia({
-      audio: audioConstraints,
-      video: false,
-    })
-
-    // 关键：直接把原始 getUserMedia 音频轨交给 WebRTC。
-    // 绝不先通过 MediaStreamAudioDestinationNode、GainNode、CompressorNode 重采样/处理，
-    // 这样浏览器的 AEC3 才能根据实际扬声器 render reference 稳定工作。
-    state.localStream = state.rawLocalStream
-
-    const localTrack = state.localStream.getAudioTracks()[0]
-    if (localTrack) {
-      try { localTrack.contentHint = 'speech' } catch (_) {}
-      const settings = getSupportedAudioSettings(localTrack)
-      const caps = getSupportedAudioCapabilities(localTrack)
-      log(`音频处理：AEC=${settings.echoCancellation ?? '?'} NS=${settings.noiseSuppression ?? '?'} AGC=${settings.autoGainControl ?? '?'}${settings.voiceIsolation != null ? ` VI=${settings.voiceIsolation}` : ''}`)
-      if (caps.echoCancellationType) log(`AEC 能力：${JSON.stringify(caps.echoCancellationType)}`)
-    }
-
-    state.room = joinRoom(CONFIG, roomId)
-    state.joined = true
-
-    state.room.onPeerLeave = peerId => {
-      log(`对方离开：${shortId(peerId)}`)
-      const item = state.peers.get(peerId)
-      try { if (item?.audio) { item.audio.pause(); item.audio.srcObject = null } } catch (_) {}
-      state.peers.delete(peerId)
-      removePeerCard(peerId)
-      broadcastPresence()
-    }
-
-    state.room.onPeerStream = (stream, peerId) => {
-      log(`收到对方音频：${shortId(peerId)}`)
-      attachRemoteAudio(stream, peerId)
-      setTimeout(optimizePeerSenders, 120)
-    }
-
-    // 用 Trystero action 做极轻量的昵称发现，不参与音频传输。
-    const presence = state.room.makeAction('presence-v1')
-    state.presence = presence
-    presence.onMessage = (data, {peerId}) => {
-      const old = state.peers.get(peerId) || {}
-      state.peers.set(peerId, {...old, name: data?.name || old.name || `设备 ${shortId(peerId)}`})
-      upsertPeerCard(peerId, old.audio ? '通话已连接' : '正在连接…')
-    }
-    // 只注册一次 onPeerJoin。Trystero 0.25.x 在重新赋值 onPeerJoin 时会立即回放当前已有 Peer，
-    // 因此不能先注册一个媒体处理器，再用包装函数重新赋值，否则已有 Peer 可能收到重复媒体。
-    state.room.onPeerJoin = peerId => {
-      log(`发现对方：${shortId(peerId)}`)
-      const existing = state.peers.get(peerId) || {}
-      state.peers.set(peerId, {
-        name: existing.name || `设备 ${shortId(peerId)}`,
-        audio: existing.audio
-      })
-      upsertPeerCard(peerId, '正在建立音频连接…')
-
-      // 已存在的 Peer 不在这里重复广播；新加入的 Peer 只定向发送一次。
-      state.room.addStream(state.localStream, {target: peerId})
-      presence.send({name: state.displayName}, {target: peerId})
-      setTimeout(optimizePeerSenders, 180)
-    }
-
-    // 房间中当前已经存在的 Peer，只做一次全量广播。
-    state.room.addStream(state.localStream)
-    // 只在初始广播完成后优化一次发送器。
-    setTimeout(optimizePeerSenders, 300)
-    startStatsLoop()
-
-    $('joinView').classList.remove('active')
-    $('callView').classList.add('active')
-    $('roomTitle').textContent = `房间 · ${roomId}`
-    $('roomCode').textContent = `P2P 房间号：${roomId}`
-    $('myName').textContent = state.displayName
-    $('myId').textContent = `Peer ID：${selfId}`
-    $('myAvatar').textContent = avatarText(state.displayName, selfId)
-    setStatus('已入房间', 'ok')
-    toast('已进入房间，等待其他设备')
-    log(`进入房间 ${roomId}`)
-    await unlockAudio()
-  } catch (error) {
-    console.error(error)
-    state.joined = false
-    state.room = null
-    stopAudioPipeline()
-    state.localStream?.getTracks().forEach(t => t.stop())
-    state.rawLocalStream?.getTracks().forEach(t => t.stop())
-    state.localStream = null
-    state.rawLocalStream = null
-    $('joinBtn').disabled = false
-    setStatus('连接失败', 'err')
-    const msg = error?.name === 'NotAllowedError' ? '麦克风权限被拒绝' : `无法加入：${error?.message || error}`
-    toast(msg)
-    log(msg)
-  } finally {
-    $('joinBtn').disabled = false
-  }
+/* =========================================================================
+   INCOMING CALL MODAL
+   ========================================================================= */
+function showIncomingCallModal(callerId) {
+    const modal = document.getElementById('incoming-modal');
+    document.getElementById('incoming-caller-id').innerText = callerId;
+    document.getElementById('incoming-avatar').src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(callerId)}&backgroundColor=000000`;
+    modal.style.display = 'flex';
+    
+    updateStatusBadge('来电', 'var(--secondary)');
+    startRingTone(true);
 }
 
-function broadcastPresence() {
-  try { state.presence?.send({name: state.displayName}) } catch (_) {}
+function hideIncomingCallModal() {
+    document.getElementById('incoming-modal').style.display = 'none';
+    stopRingTone();
 }
 
-async function hangup() {
-  if (!state.joined) return
-  try { state.room?.leave?.() } catch (_) {}
-  stopAudioPipeline()
-  state.localStream?.getTracks().forEach(t => t.stop())
-  state.rawLocalStream?.getTracks().forEach(t => t.stop())
-  state.localStream = null
-  state.rawLocalStream = null
-  state.room = null
-  state.presence = null
-  state.joined = false
-  state.muted = false
-  $('muteBtn').textContent = '🎙️ 静音'
-  $('muteBtn').classList.remove('active')
-  $('peerList').innerHTML = '<div id="emptyState" class="empty">等待其他人加入房间…<br>保持此页面打开即可。</div>'
-  $('callView').classList.remove('active')
-  $('joinView').classList.add('active')
-  setStatus('未连接')
-  toast('已挂断')
+async function acceptIncomingCall() {
+    if (!state.incomingCallObj) return;
+    const call = state.incomingCallObj;
+    hideIncomingCallModal();
+
+    try {
+        state.localStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
+        call.answer(state.localStream);
+        handleCall(call);
+    } catch(e) {
+        showError(document.getElementById('call-error'), "错误：需要麦克风权限才能接听来电。");
+        cleanup();
+    }
 }
 
+function declineIncomingCall() {
+    if (state.incomingCallObj) {
+        state.incomingCallObj.close();
+        state.incomingCallObj = null;
+    }
+    hideIncomingCallModal();
+    updateStatusBadge('在线', 'var(--primary)');
+}
+
+/* =========================================================================
+   START CALL (OUTGOING)
+   ========================================================================= */
+async function startCall() {
+    const target = document.getElementById('peer-id').value.trim();
+    const localId = document.getElementById('my-id').innerText.trim();
+    const errorBox = document.getElementById('call-error');
+
+    if (target.length < 4) {
+        showError(errorBox, "错误：对方用户名至少需要4个字符。");
+        return;
+    }
+
+    if (target.toLowerCase() === localId.toLowerCase()) {
+        showError(errorBox, "错误：你不能连接自己的用户名。");
+        return;
+    }
+
+    hideError(errorBox);
+
+    try {
+        state.localStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
+        
+        // Show Outgoing Calling UI
+        showOutgoingCallUI(target);
+        startRingTone(false);
+
+        const call = state.peer.call(target, state.localStream);
+        state.currentCall = call;
+        handleCall(call, true);
+    } catch(e) {
+        showError(errorBox, "错误：需要麦克风权限才能拨打电话。");
+        cancelOutgoingCallUI();
+    }
+}
+
+function showOutgoingCallUI(targetName) {
+    document.getElementById('outgoing-target-name').innerText = targetName;
+    document.getElementById('outgoing-box').style.display = 'block';
+    document.getElementById('btn-start-call').disabled = true;
+    updateStatusBadge('呼叫中...', 'var(--secondary)');
+}
+
+function cancelOutgoingCallUI() {
+    document.getElementById('outgoing-box').style.display = 'none';
+    document.getElementById('btn-start-call').disabled = false;
+    stopRingTone();
+    if (state.currentCall) {
+        state.currentCall.close();
+        state.currentCall = null;
+    }
+    updateStatusBadge('在线', 'var(--primary)');
+}
+
+/* =========================================================================
+   HANDLE ACTIVE CALL & WEBRTC PIPELINE
+   ========================================================================= */
+function handleCall(call, isOutgoing = false) {
+    state.currentCall = call;
+
+    // Monitor WebRTC Connection States for Clean Disconnect Detection
+    if (call.peerConnection) {
+        call.peerConnection.oniceconnectionstatechange = () => {
+            const iceState = call.peerConnection.iceConnectionState;
+            if (iceState === 'disconnected' || iceState === 'failed' || iceState === 'closed') {
+                handlePeerDisconnected("对方连接已断开或关闭。");
+            }
+        };
+        call.peerConnection.onconnectionstatechange = () => {
+            const connState = call.peerConnection.connectionState;
+            if (connState === 'disconnected' || connState === 'failed' || connState === 'closed') {
+                handlePeerDisconnected("通话已终止。");
+            }
+        };
+    }
+
+    call.on('stream', async (remoteStream) => {
+        stopRingTone();
+        document.getElementById('outgoing-box').style.display = 'none';
+        document.getElementById('btn-start-call').disabled = false;
+
+        document.getElementById('call-controls').style.display = 'none';
+        document.getElementById('call-stage').style.display = 'block';
+        
+        document.getElementById('remote-user-tag').innerText = call.peer.substring(0, 10);
+        document.getElementById('peer-avatar').src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(call.peer)}&backgroundColor=000000`;
+        
+        updateStatusBadge('通话中', 'var(--primary)');
+        playConnectChime();
+
+        // Attach to muted remote audio element to prevent browser double-audio
+        const remoteAudio = document.getElementById('remote-audio');
+        remoteAudio.srcObject = remoteStream;
+        remoteAudio.muted = true;
+
+        // Setup Web Audio API Graph for Remote Audio (Gain + Dynamics Compressor)
+        if (!state.remoteAudioCtx) {
+            state.remoteAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } else if (state.remoteAudioCtx.state === 'suspended') {
+            state.remoteAudioCtx.resume();
+        }
+
+        if (state.remoteSource) state.remoteSource.disconnect();
+        if (state.gainNode) state.gainNode.disconnect();
+        if (state.compressor) state.compressor.disconnect();
+
+        state.remoteSource = state.remoteAudioCtx.createMediaStreamSource(remoteStream);
+        state.gainNode = state.remoteAudioCtx.createGain();
+        state.compressor = state.remoteAudioCtx.createDynamicsCompressor();
+
+        state.compressor.threshold.value = -18;
+        state.compressor.knee.value = 12;
+        state.compressor.ratio.value = 4;
+        state.compressor.attack.value = 0.003;
+        state.compressor.release.value = 0.25;
+
+        const sliderVal = document.getElementById('gain-slider').value;
+        state.gainNode.gain.value = sliderVal / 100;
+
+        state.remoteSource.connect(state.gainNode);
+        state.gainNode.connect(state.compressor);
+        state.compressor.connect(state.remoteAudioCtx.destination);
+
+        // Setup Local Microphone Visualizer
+        setupVisualizer(state.localStream);
+        setupGainSlider();
+        startStats(call.peerConnection);
+        startCallTimer();
+        resetControlButtons();
+    });
+
+    call.on('close', () => {
+        handlePeerDisconnected("通话已结束。");
+    });
+}
+
+function handlePeerDisconnected(msg) {
+    if (state.currentCall || state.callStartTime > 0) {
+        playDisconnectTone();
+        showInfoBanner(msg || "通话已结束。");
+    }
+    cleanup();
+}
+
+/* =========================================================================
+   HARDWARE AUDIO PROCESSING & MUTE CONTROLS
+   ========================================================================= */
 function toggleMute() {
-  if (!state.localStream) return
-  state.muted = !state.muted
-  state.localStream.getAudioTracks().forEach(track => track.enabled = !state.muted)
-  $('muteBtn').textContent = state.muted ? '🔇 已静音' : '🎙️ 静音'
-  $('muteBtn').classList.toggle('active', state.muted)
-  toast(state.muted ? '麦克风已静音' : '麦克风已恢复')
+    if (!state.localStream) return;
+    state.isMuted = !state.isMuted;
+    
+    state.localStream.getAudioTracks().forEach(track => {
+        track.enabled = !state.isMuted;
+    });
+
+    const btn = document.getElementById('btn-mute');
+    const overlay = document.getElementById('viz-muted-overlay');
+
+    if (state.isMuted) {
+        btn.innerText = "麦克风：已静音";
+        btn.classList.add('btn-muted-active');
+        btn.classList.remove('btn-toggle-active');
+        if (overlay) overlay.style.display = 'flex';
+    } else {
+        btn.innerText = "麦克风：开启";
+        btn.classList.remove('btn-muted-active');
+        btn.classList.add('btn-toggle-active');
+        if (overlay) overlay.style.display = 'none';
+    }
+
+    playMuteBeep(state.isMuted);
 }
 
-async function shareRoom() {
-  const url = new URL(location.href)
-  url.searchParams.set('room', state.roomId)
-  if (navigator.share) {
-    try { await navigator.share({title:'P2P 通话', text:`加入我的 P2P 通话房间：${state.roomId}`, url:url.href}); return } catch (_) {}
-  }
-  await navigator.clipboard?.writeText(url.href)
-  toast('房间链接已复制')
+async function toggleNS() {
+    state.isNsOn = !state.isNsOn;
+    const btn = document.getElementById('btn-ns');
+    btn.innerText = `噪声抑制：${state.isNsOn ? '开' : '关'}`;
+    btn.className = state.isNsOn ? 'btn-toggle-active' : 'btn-toggle-inactive';
+    await applyAudioConstraints();
 }
 
-$('randomBtn').onclick = () => { $('roomInput').value = randomRoom(); toast('已生成随机房间号') }
-$('copyBtn').onclick = async () => {
-  const room = $('roomInput').value.trim()
-  if (!room) { toast('先填写房间号'); return }
-  try { await navigator.clipboard.writeText(room); toast('房间号已复制') } catch (_) { toast('复制失败，请长按输入框') }
+async function toggleEC() {
+    state.isEcOn = !state.isEcOn;
+    const btn = document.getElementById('btn-ec');
+    btn.innerText = `回声消除：${state.isEcOn ? '开' : '关'}`;
+    btn.className = state.isEcOn ? 'btn-toggle-active' : 'btn-toggle-inactive';
+    await applyAudioConstraints();
 }
-$('joinBtn').onclick = join
-$('hangBtn').onclick = hangup
-$('muteBtn').onclick = toggleMute
-$('shareBtn').onclick = shareRoom
-window.addEventListener('click', unlockAudio, {passive:true})
-window.addEventListener('touchstart', unlockAudio, {passive:true})
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') unlockAudio() })
-window.addEventListener('pagehide', () => { try { state.room?.leave?.() } catch (_) {} })
-window.addEventListener('visibilitychange', () => {
-  if (!document.hidden) unlockAudio()
-})
-window.addEventListener('focus', unlockAudio, {passive:true})
-window.addEventListener('pageshow', unlockAudio, {passive:true})
-navigator.mediaDevices?.addEventListener?.('devicechange', () => {
-  // 设备切换后不重建媒体轨，避免破坏 AEC 状态；提示开发者当前设置。
-  const track = state.localStream?.getAudioTracks?.()[0]
-  if (track) log(`音频设备变化：${JSON.stringify(getSupportedAudioSettings(track))}`)
-})
 
-const params = new URLSearchParams(location.search)
-$('roomInput').value = params.get('room') || localStorage.getItem('p2p-call-room') || ''
-$('nameInput').value = localStorage.getItem('p2p-call-name') || ''
-if (!$('roomInput').value) $('roomInput').value = randomRoom()
+async function applyAudioConstraints() {
+    audioConstraints.audio.noiseSuppression = state.isNsOn;
+    audioConstraints.audio.echoCancellation = state.isEcOn;
 
-// 防止浏览器在移动端把页面手势识别成选中文本/拖拽。
-document.addEventListener('contextmenu', e => { if (e.target.matches('button,.avatar,.logo')) e.preventDefault() })
+    if (state.localStream) {
+        const audioTrack = state.localStream.getAudioTracks()[0];
+        if (audioTrack && typeof audioTrack.applyConstraints === 'function') {
+            try {
+                await audioTrack.applyConstraints({
+                    noiseSuppression: state.isNsOn,
+                    echoCancellation: state.isEcOn
+                });
+            } catch (err) {
+                console.warn("硬件音频约束更新失败：", err);
+            }
+        }
+    }
+}
+
+function resetControlButtons() {
+    state.isMuted = false;
+    state.isNsOn = true;
+    state.isEcOn = true;
+
+    const btnMute = document.getElementById('btn-mute');
+    btnMute.innerText = "麦克风：开启";
+    btnMute.className = "btn-toggle-active";
+
+    const btnNs = document.getElementById('btn-ns');
+    btnNs.innerText = "噪声抑制";
+    btnNs.className = "btn-toggle-active";
+
+    const btnEc = document.getElementById('btn-ec');
+    btnEc.innerText = "回声消除";
+    btnEc.className = "btn-toggle-active";
+
+    const overlay = document.getElementById('viz-muted-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+/* =========================================================================
+   CALL DURATION TIMER
+   ========================================================================= */
+function startCallTimer() {
+    state.callStartTime = Date.now();
+    const timerDisplay = document.getElementById('call-timer');
+    timerDisplay.innerText = "00:00";
+
+    if (state.callTimerInterval) clearInterval(state.callTimerInterval);
+
+    state.callTimerInterval = setInterval(() => {
+        const elapsed = Date.now() - state.callStartTime;
+        const totalSeconds = Math.floor(elapsed / 1000);
+        
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+        const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+
+        if (hours > 0) {
+            timerDisplay.innerText = `${hours.toString().padStart(2, '0')}:${minutes}:${seconds}`;
+        } else {
+            timerDisplay.innerText = `${minutes}:${seconds}`;
+        }
+    }, 1000);
+}
+
+function stopCallTimer() {
+    if (state.callTimerInterval) clearInterval(state.callTimerInterval);
+    state.callTimerInterval = null;
+    state.callStartTime = 0;
+    const timerDisplay = document.getElementById('call-timer');
+    if (timerDisplay) timerDisplay.innerText = "00:00";
+}
+
+/* =========================================================================
+   VOLUME GAIN SLIDER
+   ========================================================================= */
+function setupGainSlider() {
+    const slider = document.getElementById('gain-slider');
+    const newSlider = slider.cloneNode(true);
+    slider.parentNode.replaceChild(newSlider, slider);
+
+    newSlider.addEventListener('input', () => {
+        const value = Number(newSlider.value);
+        const multiplier = (value / 100).toFixed(1);
+        document.getElementById('gain-value').innerText = multiplier + "x";
+        if (state.gainNode) {
+            state.gainNode.gain.value = value / 100;
+        }
+    });
+}
+
+/* =========================================================================
+   CANVAS AUDIO VISUALIZER
+   ========================================================================= */
+function setupVisualizer(stream) {
+    const vizCanvas = document.getElementById('viz-canvas');
+    const vCtx = vizCanvas.getContext('2d');
+    
+    vizCanvas.width = vizCanvas.offsetWidth;
+    vizCanvas.height = vizCanvas.offsetHeight;
+
+    if (!state.localAudioCtx) {
+        state.localAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } else if (state.localAudioCtx.state === 'suspended') {
+        state.localAudioCtx.resume();
+    }
+
+    try {
+        const source = state.localAudioCtx.createMediaStreamSource(stream);
+        const analyser = state.localAudioCtx.createAnalyser();
+        
+        analyser.fftSize = 128;
+        analyser.smoothingTimeConstant = 0.85;
+        source.connect(analyser);
+
+        const data = new Uint8Array(analyser.frequencyBinCount);
+
+        function draw() {
+            state.vizAnimationId = requestAnimationFrame(draw);
+            analyser.getByteFrequencyData(data);
+
+            vCtx.clearRect(0, 0, vizCanvas.width, vizCanvas.height);
+            
+            let total = 0;
+            const sliceWidth = vizCanvas.width * 1.0 / (data.length / 2); 
+            let x = 0;
+
+            vCtx.beginPath();
+            vCtx.moveTo(0, vizCanvas.height);
+
+            for (let i = 0; i < data.length / 2; i++) {
+                total += data[i];
+                const v = state.isMuted ? 0 : data[i] / 255.0;
+                const y = vizCanvas.height - (v * vizCanvas.height * 0.8);
+
+                if (i === 0) {
+                    vCtx.moveTo(x, y);
+                } else {
+                    const prevX = x - sliceWidth;
+                    const prevV = state.isMuted ? 0 : data[i - 1] / 255.0;
+                    const prevY = vizCanvas.height - (prevV * vizCanvas.height * 0.8);
+                    const cpX = prevX + sliceWidth / 2;
+                    vCtx.quadraticCurveTo(cpX, prevY, x, y);
+                }
+                x += sliceWidth;
+            }
+
+            vCtx.lineTo(vizCanvas.width, vizCanvas.height);
+            vCtx.lineTo(0, vizCanvas.height);
+            
+            const gradient = vCtx.createLinearGradient(0, 0, 0, vizCanvas.height);
+            gradient.addColorStop(0, 'rgba(0, 243, 255, 0.45)'); 
+            gradient.addColorStop(1, 'rgba(0, 255, 65, 0.0)');  
+            
+            vCtx.fillStyle = gradient;
+            vCtx.fill();
+
+            vCtx.strokeStyle = state.isMuted ? '#ff0055' : '#00f3ff';
+            vCtx.lineWidth = 2;
+            vCtx.stroke();
+
+            const avg = total / (data.length / 2);
+            const db = state.isMuted ? '-∞' : (20 * Math.log10((avg || 1) / 255)).toFixed(1);
+            document.getElementById('db-level').innerText = `${db} dB`;
+        }
+
+        draw();
+    } catch(e) {
+        console.warn("可视化初始化失败：", e);
+    }
+}
+
+/* =========================================================================
+   TELEMETRY & WEBRTC STATS
+   ========================================================================= */
+async function startStats(pc) {
+    if (!pc) return;
+    if (state.statsInterval) clearInterval(state.statsInterval);
+    state.latencyHistory = [];
+
+    const fetchStats = async () => {
+        try {
+            const stats = await pc.getStats();
+            stats.forEach(r => {
+                if (r.type === 'remote-inbound-rtp') {
+                    const rtt = Math.round(r.roundTripTime * 1000);
+                    if (!isNaN(rtt) && rtt > 0) {
+                        state.latencyHistory.push(rtt);
+                        if (state.latencyHistory.length > 30) state.latencyHistory.shift();
+
+                        const avg = Math.round(state.latencyHistory.reduce((a, b) => a + b, 0) / state.latencyHistory.length);
+                        document.getElementById('lat-avg').innerText = avg + 'ms';
+                        
+                        const jitter = r.jitter ? (r.jitter * 1000).toFixed(1) : '--';
+                        document.getElementById('jitter').innerText = jitter + 'ms';
+
+                        const loss = r.packetsLost || 0;
+                        document.getElementById('loss').innerText = loss;
+
+                        updateQuality(avg, loss);
+                    }
+                }
+            });
+            extractNetworkInfo(stats);
+        } catch(e) {}
+    };
+
+    setTimeout(fetchStats, 1500);
+    state.statsInterval = setInterval(fetchStats, 2500);
+}
+
+function updateQuality(avg, loss) {
+    let quality = "极佳";
+    let color = "var(--primary)";
+
+    if (avg > 150 || loss > 10) {
+        quality = "较差";
+        color = "var(--danger)";
+    } else if (avg > 80 || loss > 3) {
+        quality = "一般";
+        color = "var(--warning)";
+    }
+    
+    const qEl = document.getElementById('quality');
+    qEl.innerText = quality;
+    qEl.style.color = color;
+}
+
+function extractNetworkInfo(stats) {
+    let localCandidate = null;
+    let remoteCandidate = null;
+
+    stats.forEach(report => {
+        if (report.type === "candidate-pair" && report.state === "succeeded") {
+            localCandidate = stats.get(report.localCandidateId);
+            remoteCandidate = stats.get(report.remoteCandidateId);
+            
+            if (localCandidate && remoteCandidate) {
+                const tps = `${localCandidate.candidateType} > ${remoteCandidate.candidateType}`;
+                document.getElementById("transport").innerText = tps.toUpperCase();
+            }
+        }
+    });
+
+    if (localCandidate) {
+        const localIP = localCandidate.address || localCandidate.ip || "[已隐藏]";
+        document.getElementById("local-ip").innerText = localIP;
+
+        if (localIP.startsWith("172.") || localIP.startsWith("10.") || localIP.startsWith("192.168") || localIP.startsWith("fd") || localIP.startsWith("fc")) {
+            document.getElementById("network-type").innerText = "局域网 / 隧道";
+        } else if (localIP.includes(":")) {
+            document.getElementById("network-type").innerText = "IPv6 直连";
+        } else {
+            document.getElementById("network-type").innerText = "公网";
+        }
+    }
+    
+    if (remoteCandidate) {
+        const remoteIP = remoteCandidate.address || remoteCandidate.ip || "---";
+        document.getElementById("remote-ip").innerText = remoteIP;
+    }
+}
+
+/* =========================================================================
+   CLEANUP & TEARDOWN
+   ========================================================================= */
+function endCall() {
+    if (state.currentCall) {
+        state.currentCall.close();
+    }
+    cleanup();
+}
+
+function cleanup() {
+    stopRingTone();
+    hideIncomingCallModal();
+
+    if (state.localStream) {
+        state.localStream.getTracks().forEach(t => t.stop());
+        state.localStream = null;
+    }
+
+    if (state.statsInterval) {
+        clearInterval(state.statsInterval);
+        state.statsInterval = null;
+    }
+
+    if (state.vizAnimationId) {
+        cancelAnimationFrame(state.vizAnimationId);
+        state.vizAnimationId = null;
+    }
+
+    stopCallTimer();
+
+    if (state.localAudioCtx) {
+        state.localAudioCtx.close().catch(() => {});
+        state.localAudioCtx = null;
+    }
+    if (state.remoteAudioCtx) {
+        state.remoteAudioCtx.close().catch(() => {});
+        state.remoteAudioCtx = null;
+    }
+
+    const vizCanvas = document.getElementById('viz-canvas');
+    if (vizCanvas) {
+        const vCtx = vizCanvas.getContext('2d');
+        vCtx.clearRect(0, 0, vizCanvas.width, vizCanvas.height);
+    }
+
+    document.getElementById('db-level').innerText = '-- dB';
+    document.getElementById('lat-avg').innerText = '--';
+    document.getElementById('jitter').innerText = '--';
+    document.getElementById('loss').innerText = '0';
+    document.getElementById('quality').innerText = '--';
+    document.getElementById('network-type').innerText = '---';
+    document.getElementById('transport').innerText = '---';
+    document.getElementById('local-ip').innerText = '---';
+    document.getElementById('remote-ip').innerText = '---';
+
+    state.currentCall = null;
+    state.incomingCallObj = null;
+
+    document.getElementById('outgoing-box').style.display = 'none';
+    document.getElementById('btn-start-call').disabled = false;
+    document.getElementById('call-stage').style.display = 'none';
+    
+    if (state.peer && !state.peer.destroyed) {
+        document.getElementById('call-controls').style.display = 'block';
+        updateStatusBadge('在线', 'var(--primary)');
+    } else {
+        document.getElementById('setup-phase').style.display = 'block';
+        updateStatusBadge('待机', 'var(--text-muted)', false);
+    }
+}
+
+/* =========================================================================
+   UI UTILITIES & CLIPBOARD
+   ========================================================================= */
+function showError(element, msg) {
+    if (!element) return;
+    element.innerText = msg;
+    element.style.display = 'block';
+}
+
+function hideError(element) {
+    if (!element) return;
+    element.style.display = 'none';
+}
+
+function showInfoBanner(msg, duration = 4000) {
+    const banner = document.getElementById('global-info');
+    if (!banner) return;
+    banner.innerText = msg;
+    banner.style.display = 'block';
+    setTimeout(() => {
+        banner.style.display = 'none';
+    }, duration);
+}
+
+function copyID() {
+    const idText = document.getElementById('my-id').innerText.trim();
+    if (!idText || idText === '---') return;
+    navigator.clipboard.writeText(idText);
+    
+    const btn = document.getElementById('btn-copy-id');
+    const orig = btn.innerText;
+    btn.innerText = "已复制！";
+    btn.style.color = "var(--primary)";
+    btn.style.borderColor = "var(--primary)";
+    
+    setTimeout(() => {
+        btn.innerText = orig;
+        btn.style.color = "";
+        btn.style.borderColor = "";
+    }, 2000);
+}
+
+function copyInviteLink() {
+    const idText = document.getElementById('my-id').innerText.trim();
+    if (!idText || idText === '---') return;
+    
+    const url = new URL(window.location.href);
+    url.searchParams.set('call', idText);
+    navigator.clipboard.writeText(url.toString());
+    
+    const btn = document.getElementById('btn-copy-link');
+    const orig = btn.innerText;
+    btn.innerText = "链接已复制！";
+    btn.style.color = "var(--secondary)";
+    btn.style.borderColor = "var(--secondary)";
+    
+    setTimeout(() => {
+        btn.innerText = orig;
+        btn.style.color = "";
+        btn.style.borderColor = "";
+    }, 2000);
+}
+
+function checkUrlInviteParams() {
+    const params = new URLSearchParams(window.location.search);
+    const targetPeer = params.get('call') || params.get('join');
+    if (targetPeer) {
+        const peerInput = document.getElementById('peer-id');
+        if (peerInput) {
+            peerInput.value = targetPeer.trim();
+            showInfoBanner(`已加载对方邀请链接：${targetPeer.trim()}`);
+        }
+    }
+}
+
+/* =========================================================================
+   EVENT LISTENERS & KEYBOARD SHORTCUTS
+   ========================================================================= */
+document.addEventListener('DOMContentLoaded', () => {
+    // Check localStorage for saved username
+    try {
+        const savedUser = localStorage.getItem('webrtc_p2p_username');
+        if (savedUser) {
+            document.getElementById('username-input').value = savedUser;
+        }
+    } catch(e) {}
+
+    // Button event bindings
+    document.getElementById('btn-init-uplink').addEventListener('click', initializePeer);
+    document.getElementById('btn-copy-id').addEventListener('click', copyID);
+    document.getElementById('btn-copy-link').addEventListener('click', copyInviteLink);
+    document.getElementById('btn-start-call').addEventListener('click', startCall);
+    document.getElementById('btn-cancel-outgoing').addEventListener('click', cancelOutgoingCallUI);
+    document.getElementById('btn-accept').addEventListener('click', acceptIncomingCall);
+    document.getElementById('btn-decline').addEventListener('click', declineIncomingCall);
+    document.getElementById('btn-mute').addEventListener('click', toggleMute);
+    document.getElementById('btn-ns').addEventListener('click', toggleNS);
+    document.getElementById('btn-ec').addEventListener('click', toggleEC);
+    document.getElementById('btn-end-call').addEventListener('click', endCall);
+
+    // Keyboard bindings
+    window.addEventListener('keydown', (e) => {
+        const activeTag = document.activeElement ? document.activeElement.tagName : '';
+        
+        // Enter key in inputs
+        if (activeTag === 'INPUT') {
+            if (e.key === 'Enter') {
+                if (document.activeElement.id === 'username-input') initializePeer();
+                if (document.activeElement.id === 'peer-id') startCall();
+            }
+            return;
+        }
+
+        // Call shortcuts
+        if (e.key === 'm' || e.key === 'M') {
+            if (state.currentCall) {
+                toggleMute();
+            }
+        } else if (e.key === 'Escape') {
+            if (state.incomingCallObj) {
+                declineIncomingCall();
+            } else if (document.getElementById('outgoing-box').style.display === 'block') {
+                cancelOutgoingCallUI();
+            } else if (state.currentCall) {
+                endCall();
+            }
+        }
+    });
+});
+
+/* Canvas resize handler */
+window.addEventListener('resize', () => {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+    
+    const newCols = Math.floor(w / fontSize);
+    if (newCols > drops.length) {
+        for (let i = drops.length; i < newCols; i++) drops.push(1);
+    } else if (newCols < drops.length) {
+        drops.length = newCols; 
+    }
+
+    const vizCanvas = document.getElementById('viz-canvas');
+    if (vizCanvas) {
+        vizCanvas.width = vizCanvas.offsetWidth;
+        vizCanvas.height = vizCanvas.offsetHeight;
+    }
+});
 </script>
 </body>
 </html>
