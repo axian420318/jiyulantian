@@ -3,200 +3,381 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LiveKit 语音通话</title>
+<title>LiveKit 语音通话诊断版</title>
 <style>
-body{font-family:Arial,sans-serif;max-width:600px;margin:40px auto;padding:0 20px}
-input{width:100%;padding:8px;box-sizing:border-box;border:1px solid #ccc;border-radius:4px;margin-bottom:10px}
+body{font-family:Arial,sans-serif;max-width:800px;margin:20px auto;padding:0 20px;background:#f5f5f5}
+h1{color:#333}
+.card{background:white;border-radius:8px;padding:20px;margin-bottom:20px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
+input{width:100%;padding:10px;margin-bottom:10px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box}
 button{padding:10px 20px;margin-right:10px;border:none;border-radius:4px;background:#007bff;color:white;cursor:pointer}
 button:disabled{background:#ccc;cursor:not-allowed}
 .danger{background:#dc3545}
-#status{margin-top:20px;padding:10px;border-radius:4px;background:#f8f9fa}
+.success{color:#28a745;font-weight:bold}
+.fail{color:#dc3545;font-weight:bold}
+.info{color:#007bff}
+#log{background:#1e1e1e;color:#d4d4d4;font-family:monospace;padding:15px;border-radius:4px;height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all}
+.step{margin-bottom:5px;padding:5px;border-radius:3px}
+.step.success{background:#d4edda;color:#155724}
+.step.fail{background:#f8d7da;color:#721c24}
+.step.running{background:#fff3cd;color:#856404}
+.step.pending{background:#e2e3e5;color:#383d41}
 ul{list-style:none;padding:0}
 li{padding:5px 0;border-bottom:1px solid #eee}
 </style>
 </head>
 <body>
-<h1>LiveKit 实时语音通话</h1>
-<input id="room" placeholder="房间名" value="test-room">
-<input id="identity" placeholder="用户名" value="user-1">
-<button id="join">加入房间</button>
-<button id="leave" class="danger" disabled>离开</button>
-<button id="mute" disabled>静音</button>
-<div id="status">未连接</div>
-<h3>参与者</h3>
-<ul id="participants"></ul>
+<h1>LiveKit 语音通话诊断版</h1>
+
+<div class="card">
+  <h3>连接配置</h3>
+  <input id="room" placeholder="房间名" value="test-room">
+  <input id="identity" placeholder="用户名" value="user-1">
+  <button id="diagnoseBtn">开始诊断</button>
+  <button id="joinBtn" disabled>直接加入房间</button>
+  <button id="leaveBtn" class="danger" disabled>离开</button>
+  <button id="muteBtn" disabled>静音</button>
+</div>
+
+<div class="card">
+  <h3>诊断步骤</h3>
+  <div id="steps"></div>
+</div>
+
+<div class="card">
+  <h3>详细日志</h3>
+  <div id="log"></div>
+</div>
+
+<div class="card">
+  <h3>参与者</h3>
+  <ul id="participants"></ul>
+</div>
 
 <script>
-// ========== LiveKit 配置（URL 可公开，Worker 地址用于获取 Token） ==========
+// ========== 配置 ==========
 const LIVEKIT_URL = 'wss://wangguosha-i78zv7oq.livekit.cloud';
 const TOKEN_URL = 'https://tiny-river-f5e1.dianzilong8784253.workers.dev/';
 
-// ========== 精简版 LiveKit 语音封装 ==========
-class LiveKitVoice {
-  constructor() {
-    this.room = null;
-    this.isMuted = false;
-    this.remoteAudioElements = new Map();
-    this.eventHandlers = {};
-  }
+// ========== 日志工具 ==========
+const logDiv = document.getElementById('log');
+const stepsDiv = document.getElementById('steps');
 
-  on(event, handler) {
-    if (!this.eventHandlers[event]) this.eventHandlers[event] = [];
-    this.eventHandlers[event].push(handler);
-  }
+function log(message, type = 'info') {
+  const time = new Date().toLocaleTimeString();
+  const prefix = type === 'error' ? '[ERROR]' : type === 'success' ? '[OK]' : '[INFO]';
+  logDiv.innerHTML += `${time} ${prefix} ${message}\n`;
+  logDiv.scrollTop = logDiv.scrollHeight;
+}
 
-  emit(event, data) {
-    (this.eventHandlers[event] || []).forEach(fn => fn(data));
-  }
+function addStep(name, status = 'pending', detail = '') {
+  const stepDiv = document.createElement('div');
+  stepDiv.className = `step ${status}`;
+  stepDiv.innerHTML = `<strong>${name}</strong> ${detail ? '- ' + detail : ''}`;
+  stepsDiv.appendChild(stepDiv);
+  stepsDiv.scrollTop = stepsDiv.scrollHeight;
+  return stepDiv;
+}
 
-  async _getToken(roomName, identity) {
+function updateStep(element, status, detail = '') {
+  element.className = `step ${status}`;
+  element.innerHTML = `<strong>${element.querySelector('strong').textContent}</strong> ${detail ? '- ' + detail : ''}`;
+}
+
+// ========== 页面元素 ==========
+const roomInput = document.getElementById('room');
+const identityInput = document.getElementById('identity');
+const diagnoseBtn = document.getElementById('diagnoseBtn');
+const joinBtn = document.getElementById('joinBtn');
+const leaveBtn = document.getElementById('leaveBtn');
+const muteBtn = document.getElementById('muteBtn');
+const participantsList = document.getElementById('participants');
+
+let room = null;
+let isMuted = false;
+let diagnosticRunning = false;
+
+// ========== 步骤：检查运行环境 ==========
+async function checkEnvironment() {
+  const stepEl = addStep('检查运行环境 (HTTP/HTTPS)');
+  updateStep(stepEl, 'running');
+  if (window.location.protocol === 'file:') {
+    updateStep(stepEl, 'fail', '当前通过 file:// 打开，浏览器会阻止 fetch 请求');
+    log('运行环境: file:// 协议，无法进行网络请求', 'error');
+    return false;
+  }
+  if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    updateStep(stepEl, 'fail', '非 localhost 的 HTTP 可能被浏览器限制麦克风或混合内容');
+    log('建议使用 localhost 或 HTTPS 部署', 'error');
+    return false;
+  }
+  updateStep(stepEl, 'success', '运行环境正常');
+  log('运行环境: ' + window.location.protocol + '//' + window.location.host);
+  return true;
+}
+
+// ========== 步骤：加载 LiveKit SDK ==========
+async function loadSDK() {
+  const stepEl = addStep('加载 LiveKit SDK');
+  updateStep(stepEl, 'running');
+  if (window.LivekitClient) {
+    updateStep(stepEl, 'success', 'SDK 已存在');
+    log('LiveKit SDK 已加载');
+    return true;
+  }
+  try {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js';
+      script.onload = resolve;
+      script.onerror = () => reject(new Error('SDK 脚本加载失败'));
+      document.head.appendChild(script);
+    });
+    updateStep(stepEl, 'success', 'SDK 加载成功');
+    log('LiveKit SDK 加载成功，版本: ' + LivekitClient.version || '未知');
+    return true;
+  } catch (err) {
+    updateStep(stepEl, 'fail', err.message);
+    log('LiveKit SDK 加载失败: ' + err.message, 'error');
+    return false;
+  }
+}
+
+// ========== 步骤：测试 Worker Token 获取 ==========
+async function testToken() {
+  const stepEl = addStep('测试 Worker Token 获取');
+  updateStep(stepEl, 'running');
+  const roomName = roomInput.value.trim();
+  const identity = identityInput.value.trim();
+  if (!roomName || !identity) {
+    updateStep(stepEl, 'fail', '房间名或用户名为空');
+    log('房间名和用户名不能为空', 'error');
+    return null;
+  }
+  try {
     const response = await fetch(TOKEN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roomName, identity }),
     });
-    if (!response.ok) throw new Error('获取 Token 失败: ' + response.status);
+    if (!response.ok) {
+      throw new Error('HTTP 状态码 ' + response.status);
+    }
     const data = await response.json();
+    if (!data.token) {
+      throw new Error('返回数据中没有 token 字段');
+    }
+    updateStep(stepEl, 'success', 'Token 获取成功');
+    log('Token 获取成功，前 20 个字符: ' + data.token.substring(0, 20) + '...');
     return data.token;
-  }
-
-  async _loadSDK() {
-    if (window.LivekitClient) return;
-    await new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js';
-      script.onload = resolve;
-      script.onerror = () => reject(new Error('LiveKit SDK 加载失败'));
-      document.head.appendChild(script);
-    });
-  }
-
-  async join(roomName, identity) {
-    if (this.room) throw new Error('已在房间中');
-    await this._loadSDK();
-    const token = await this._getToken(roomName, identity);
-    this.emit('connecting', { roomName, identity });
-    this.room = new LivekitClient.Room({ adaptiveStream: true, dynacast: true });
-    this._setupRoomEvents();
-    await this.room.connect(LIVEKIT_URL, token);
-    await this.room.localParticipant.setMicrophoneEnabled(true);
-    this.isMuted = false;
-    this.emit('connected', { localParticipant: this.room.localParticipant, room: this.room });
-  }
-
-  async leave() {
-    if (!this.room) return;
-    await this.room.disconnect();
-    this.room = null;
-    this.remoteAudioElements.clear();
-    this.emit('disconnected');
-  }
-
-  async setMuted(muted) {
-    if (!this.room) return;
-    await this.room.localParticipant.setMicrophoneEnabled(!muted);
-    this.isMuted = muted;
-    this.emit('mute-changed', { muted });
-  }
-
-  async toggleMute() {
-    await this.setMuted(!this.isMuted);
-  }
-
-  _setupRoomEvents() {
-    const room = this.room;
-    room.on(LivekitClient.RoomEvent.ParticipantConnected, p => this.emit('participant-joined', p));
-    room.on(LivekitClient.RoomEvent.ParticipantDisconnected, p => {
-      const el = this.remoteAudioElements.get(p.sid);
-      if (el) { el.remove(); this.remoteAudioElements.delete(p.sid); }
-      this.emit('participant-left', p);
-    });
-    room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
-      if (track.kind === 'audio') {
-        const el = track.attach();
-        el.play().catch(e => console.warn('自动播放被阻止', e));
-        this.remoteAudioElements.set(participant.sid, el);
-        this.emit('track-subscribed', { track, participant });
-      }
-    });
-    room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
-      if (track.kind === 'audio') {
-        const el = this.remoteAudioElements.get(participant.sid);
-        if (el) { el.remove(); this.remoteAudioElements.delete(participant.sid); }
-      }
-    });
-    room.on(LivekitClient.RoomEvent.Disconnected, () => {
-      this.room = null;
-      this.remoteAudioElements.clear();
-      this.emit('disconnected');
-    });
-  }
-
-  getParticipants() {
-    if (!this.room) return [];
-    const list = [{ identity: this.room.localParticipant.identity, sid: this.room.localParticipant.sid, isLocal: true }];
-    this.room.remoteParticipants.forEach(p => list.push({ identity: p.identity, sid: p.sid, isLocal: false }));
-    return list;
+  } catch (err) {
+    updateStep(stepEl, 'fail', err.message);
+    log('Worker Token 获取失败: ' + err.message, 'error');
+    log('请确认 Worker 地址可访问且环境变量已正确设置', 'error');
+    return null;
   }
 }
 
-// ========== 页面逻辑 ==========
-const voice = new LiveKitVoice();
-const roomInput = document.getElementById('room');
-const identityInput = document.getElementById('identity');
-const joinBtn = document.getElementById('join');
-const leaveBtn = document.getElementById('leave');
-const muteBtn = document.getElementById('mute');
-const statusDiv = document.getElementById('status');
-const participantsList = document.getElementById('participants');
+// ========== 步骤：连接 LiveKit ==========
+async function connectLiveKit(token) {
+  const stepEl = addStep('连接 LiveKit 服务器');
+  updateStep(stepEl, 'running');
+  if (!window.LivekitClient) {
+    updateStep(stepEl, 'fail', 'SDK 未加载');
+    return false;
+  }
+  const roomName = roomInput.value.trim();
+  const identity = identityInput.value.trim();
+  try {
+    const newRoom = new LivekitClient.Room({ adaptiveStream: true, dynacast: true });
+    // 设置事件
+    newRoom.on(LivekitClient.RoomEvent.ParticipantConnected, p => {
+      log('参与者加入: ' + p.identity);
+      updateParticipants();
+    });
+    newRoom.on(LivekitClient.RoomEvent.ParticipantDisconnected, p => {
+      log('参与者离开: ' + p.identity);
+      updateParticipants();
+    });
+    newRoom.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      if (track.kind === 'audio') {
+        const el = track.attach();
+        el.play().catch(e => log('自动播放被阻止: ' + e.message, 'error'));
+        log('收到音频流: ' + participant.identity);
+      }
+    });
+    newRoom.on(LivekitClient.RoomEvent.Disconnected, () => {
+      log('已断开连接');
+      room = null;
+      updateButtons();
+      updateParticipants();
+    });
 
+    await newRoom.connect(LIVEKIT_URL, token);
+    room = newRoom;
+    updateStep(stepEl, 'success', '连接成功');
+    log('LiveKit 连接成功');
+    return true;
+  } catch (err) {
+    updateStep(stepEl, 'fail', err.message);
+    log('LiveKit 连接失败: ' + err.message, 'error');
+    log('可能原因: 网络问题、Token 无效、房间名违规、LiveKit URL 错误', 'error');
+    return false;
+  }
+}
+
+// ========== 步骤：开启麦克风 ==========
+async function enableMicrophone() {
+  const stepEl = addStep('开启麦克风');
+  updateStep(stepEl, 'running');
+  if (!room) {
+    updateStep(stepEl, 'fail', '未连接到房间');
+    return false;
+  }
+  try {
+    await room.localParticipant.setMicrophoneEnabled(true);
+    updateStep(stepEl, 'success', '麦克风已开启');
+    log('麦克风已开启');
+    return true;
+  } catch (err) {
+    updateStep(stepEl, 'fail', err.message);
+    log('开启麦克风失败: ' + err.message, 'error');
+    log('请检查浏览器是否授予麦克风权限', 'error');
+    return false;
+  }
+}
+
+// ========== 更新参与者列表 ==========
 function updateParticipants() {
   participantsList.innerHTML = '';
-  voice.getParticipants().forEach(p => {
+  if (!room) return;
+  const local = room.localParticipant;
+  const liLocal = document.createElement('li');
+  liLocal.textContent = `${local.identity} (你)`;
+  participantsList.appendChild(liLocal);
+  room.remoteParticipants.forEach(p => {
     const li = document.createElement('li');
-    li.textContent = p.isLocal ? `${p.identity} (你)` : p.identity;
+    li.textContent = p.identity;
     participantsList.appendChild(li);
   });
 }
 
-voice.on('connecting', () => { statusDiv.textContent = '正在连接...'; });
-voice.on('connected', () => {
-  statusDiv.textContent = '已连接';
-  joinBtn.disabled = true;
-  leaveBtn.disabled = false;
-  muteBtn.disabled = false;
-  updateParticipants();
-});
-voice.on('disconnected', () => {
-  statusDiv.textContent = '已断开';
-  joinBtn.disabled = false;
-  leaveBtn.disabled = true;
-  muteBtn.disabled = true;
-  participantsList.innerHTML = '';
-});
-voice.on('participant-joined', updateParticipants);
-voice.on('participant-left', updateParticipants);
-voice.on('track-subscribed', data => console.log('收到音频:', data.participant.identity));
+// ========== 更新按钮状态 ==========
+function updateButtons() {
+  const connected = !!room;
+  diagnoseBtn.disabled = connected || diagnosticRunning;
+  joinBtn.disabled = connected || diagnosticRunning;
+  leaveBtn.disabled = !connected;
+  muteBtn.disabled = !connected;
+  if (connected) {
+    joinBtn.textContent = '已加入';
+    muteBtn.textContent = '静音';
+  }
+}
 
-joinBtn.addEventListener('click', async () => {
-  const room = roomInput.value.trim();
+// ========== 主诊断流程 ==========
+async function runDiagnostic() {
+  if (diagnosticRunning) return;
+  diagnosticRunning = true;
+  updateButtons();
+  logDiv.innerHTML = '';
+  stepsDiv.innerHTML = '';
+  log('===== 开始诊断 =====');
+
+  // 1. 环境检查
+  const envOK = await checkEnvironment();
+  if (!envOK) {
+    log('诊断终止：环境检查未通过', 'error');
+    diagnosticRunning = false;
+    updateButtons();
+    return;
+  }
+
+  // 2. SDK 加载
+  const sdkOK = await loadSDK();
+  if (!sdkOK) {
+    log('诊断终止：SDK 加载失败', 'error');
+    diagnosticRunning = false;
+    updateButtons();
+    return;
+  }
+
+  // 3. Token 获取
+  const token = await testToken();
+  if (!token) {
+    log('诊断终止：Token 获取失败', 'error');
+    diagnosticRunning = false;
+    updateButtons();
+    return;
+  }
+
+  // 4. 连接 LiveKit
+  const connectOK = await connectLiveKit(token);
+  if (!connectOK) {
+    log('诊断终止：LiveKit 连接失败', 'error');
+    diagnosticRunning = false;
+    updateButtons();
+    return;
+  }
+
+  // 5. 开启麦克风
+  const micOK = await enableMicrophone();
+  if (!micOK) {
+    log('诊断完成，但麦克风开启失败', 'error');
+  } else {
+    log('===== 全部诊断通过，语音通话就绪 =====', 'success');
+  }
+
+  diagnosticRunning = false;
+  updateButtons();
+}
+
+// ========== 直接加入（复用诊断通过后的连接） ==========
+async function directJoin() {
+  if (room) return;
+  const roomName = roomInput.value.trim();
   const identity = identityInput.value.trim();
-  if (!room || !identity) return alert('请输入房间名和用户名');
-  joinBtn.disabled = true;
+  if (!roomName || !identity) {
+    alert('请输入房间名和用户名');
+    return;
+  }
   try {
-    await voice.join(room, identity);
+    log('直接加入房间...');
+    // 简化流程：直接调用完整诊断的前三步
+    const token = await testToken();
+    if (!token) throw new Error('Token 获取失败');
+    await connectLiveKit(token);
+    await enableMicrophone();
   } catch (err) {
-    console.error(err);
-    statusDiv.textContent = '连接失败: ' + err.message;
-    joinBtn.disabled = false;
+    log('加入失败: ' + err.message, 'error');
+    alert('加入失败，请查看日志');
+  }
+  updateButtons();
+}
+
+// ========== 事件绑定 ==========
+diagnoseBtn.addEventListener('click', runDiagnostic);
+joinBtn.addEventListener('click', directJoin);
+leaveBtn.addEventListener('click', async () => {
+  if (room) {
+    await room.disconnect();
+    room = null;
+    updateButtons();
+    updateParticipants();
+    log('已手动离开房间');
   }
 });
-
-leaveBtn.addEventListener('click', () => voice.leave());
 muteBtn.addEventListener('click', async () => {
-  await voice.toggleMute();
-  muteBtn.textContent = voice.isMuted ? '取消静音' : '静音';
+  if (!room) return;
+  isMuted = !isMuted;
+  await room.localParticipant.setMicrophoneEnabled(!isMuted);
+  muteBtn.textContent = isMuted ? '取消静音' : '静音';
+  log(isMuted ? '已静音' : '已取消静音');
 });
+
+// 初始状态
+updateButtons();
+log('页面加载完成，点击“开始诊断”按钮进行连接测试');
+log('提示：请确保通过 HTTP 服务器访问（如 http://localhost:8080）');
 </script>
 </body>
 </html>
