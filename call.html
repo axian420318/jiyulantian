@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b1020">
+<meta name="description" content="基于 Trystero + WebRTC 的 P2P 全双工语音通话">
+<title>P2P 全双工通话</title>
+<style>
+:root{
+  --bg:#080c17;
+  --panel:rgba(18,25,43,.78);
+  --panel-2:rgba(26,35,58,.72);
+  --line:rgba(255,255,255,.09);
+  --text:#f5f7fb;
+  --muted:#9da8bd;
+  --accent:#78a7ff;
+  --accent-2:#5c7cff;
+  --danger:#ff5d67;
+  --ok:#5ee69a;
+  --shadow:0 20px 60px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;background:var(--bg);color:var(--text);font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif}
+body{overflow:hidden}
+button,input{font:inherit}
+.app{height:100dvh;display:flex;flex-direction:column;max-width:560px;margin:auto;position:relative;overflow:hidden;background:
+ radial-gradient(circle at 50% -10%,rgba(92,124,255,.24),transparent 36%),
+ linear-gradient(180deg,#0b1020 0%,#070a12 100%)}
+.topbar{padding:calc(12px + env(safe-area-inset-top)) 18px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);backdrop-filter:blur(20px);background:rgba(8,12,23,.56);z-index:5}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#6b8cff,#3e58e8);box-shadow:0 10px 28px rgba(78,99,255,.3);font-size:19px}
+.title{font-size:15px;font-weight:800;letter-spacing:.3px}.sub{font-size:11px;color:var(--muted);margin-top:2px}
+.status{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:7px;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:#606a7e;box-shadow:0 0 0 4px rgba(96,106,126,.12)}.dot.ok{background:var(--ok);box-shadow:0 0 0 4px rgba(94,230,154,.12)}.dot.err{background:var(--danger);box-shadow:0 0 0 4px rgba(255,93,103,.12)}
+.content{flex:1;overflow:auto;padding:18px 16px 26px;-webkit-overflow-scrolling:touch}
+.view{display:none}.view.active{display:block}
+.hero{padding:20px 4px 12px}.hero h1{font-size:30px;line-height:1.12;margin:0 0 8px;letter-spacing:-.8px}.hero p{margin:0;color:var(--muted);font-size:13px;line-height:1.65}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:16px;margin-top:14px;backdrop-filter:blur(18px)}
+.label{display:block;font-size:11px;color:var(--muted);margin:0 0 8px;font-weight:700;letter-spacing:.35px}
+input{width:100%;height:50px;padding:0 14px;border-radius:15px;border:1px solid var(--line);background:rgba(3,6,13,.48);color:var(--text);outline:none;font-size:15px}
+input:focus{border-color:rgba(120,167,255,.55);box-shadow:0 0 0 3px rgba(120,167,255,.10)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.primary,.secondary,.danger,.iconbtn{border:0;cursor:pointer;touch-action:manipulation}
+.primary{width:100%;height:52px;border-radius:16px;color:white;background:linear-gradient(135deg,var(--accent),var(--accent-2));font-weight:800;box-shadow:0 12px 28px rgba(92,124,255,.25)}
+.secondary{height:48px;border-radius:15px;color:var(--text);background:rgba(255,255,255,.06);border:1px solid var(--line);font-weight:700}
+.danger{height:48px;border-radius:15px;color:white;background:rgba(255,93,103,.14);border:1px solid rgba(255,93,103,.24);font-weight:800}
+.note{font-size:11px;color:var(--muted);line-height:1.6;margin-top:10px}
+.roomHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}.roomTitle{font-size:20px;font-weight:900}.roomCode{font-size:12px;color:var(--muted);margin-top:4px}
+.me{display:flex;align-items:center;gap:12px;padding:14px;border-radius:18px;background:rgba(120,167,255,.08);border:1px solid rgba(120,167,255,.18)}
+.avatar{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:linear-gradient(145deg,#5f7cff,#7a56d6);font-weight:900;font-size:18px;flex:0 0 auto}.who{min-width:0}.who strong{display:block;font-size:14px}.who span{display:block;margin-top:3px;color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.peerlist{margin-top:14px;display:flex;flex-direction:column;gap:10px}.peer{display:flex;align-items:center;gap:12px;padding:12px;border-radius:18px;background:var(--panel-2);border:1px solid var(--line)}.peer .avatar{width:42px;height:42px;border-radius:14px;font-size:16px}.peerinfo{min-width:0;flex:1}.peername{font-size:13px;font-weight:800}.peerstate{margin-top:3px;color:var(--muted);font-size:11px}.meter{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 5px rgba(94,230,154,.08)}
+.callControls{position:sticky;bottom:0;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px;padding-bottom:calc(2px + env(safe-area-inset-bottom))}
+.iconbtn{height:58px;border-radius:19px;background:rgba(255,255,255,.07);border:1px solid var(--line);color:var(--text);font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px}.iconbtn.active{background:rgba(120,167,255,.16);border-color:rgba(120,167,255,.34)}.iconbtn.hang{background:rgba(255,93,103,.13);border-color:rgba(255,93,103,.25);color:#ff9ea4}
+.empty{padding:25px 10px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6}
+.log{margin-top:14px;max-height:190px;overflow:auto;font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;color:#aeb9cd;background:rgba(0,0,0,.22);border-radius:16px;padding:11px;border:1px solid var(--line);white-space:pre-wrap}
+.footer{font-size:10px;color:#66738b;text-align:center;padding:12px 4px 0}.footer a{color:#8394b5}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translate(-50%,18px);opacity:0;pointer-events:none;background:rgba(17,23,39,.96);border:1px solid var(--line);color:var(--text);padding:10px 14px;border-radius:13px;font-size:12px;z-index:30;transition:.22s ease;box-shadow:var(--shadow);max-width:calc(100vw - 28px);text-align:center}.toast.show{opacity:1;transform:translate(-50%,0)}
+.hidden{display:none!important}
+@media (min-width:700px){body{background:#03050b}.app{box-shadow:0 0 70px rgba(0,0,0,.45)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><div class="logo">☎</div><div><div class="title">P2P 全双工通话</div><div class="sub">Trystero · WebRTC</div></div></div>
+    <div class="status"><i id="statusDot" class="dot"></i><span id="statusText">未连接</span></div>
+  </header>
+
+  <main class="content">
+    <section id="joinView" class="view active">
+      <div class="hero"><h1>直接建立语音通话</h1><p>输入同一个房间号，与其他设备进行浏览器端 P2P 全双工语音通话。无需账号，通话音频不经过业务服务器中转。</p></div>
+      <div class="card">
+        <label class="label" for="roomInput">房间号</label>
+        <input id="roomInput" autocomplete="off" inputmode="text" maxlength="40" placeholder="例如：blue-sky-001">
+        <div class="row">
+          <button id="randomBtn" class="secondary">随机房间</button>
+          <button id="copyBtn" class="secondary">复制房间号</button>
+        </div>
+        <div style="margin-top:12px"><label class="label" for="nameInput">昵称（仅本机显示）</label><input id="nameInput" autocomplete="off" maxlength="20" placeholder="例如：寄语蓝天"></div>
+        <button id="joinBtn" class="primary" style="margin-top:14px">进入通话</button>
+        <div class="note">首次进入时浏览器会请求麦克风权限。建议使用 HTTPS 或 localhost；普通 HTTP 页面通常无法访问麦克风。</div>
+      </div>
+      <div class="card">
+        <div style="font-weight:800;font-size:14px">关于连接</div>
+        <div class="note">本页使用 Trystero 进行房间发现与 WebRTC 建连。媒体流建立后由浏览器之间直接传输，并使用 WebRTC 的加密通道。</div>
+      </div>
+      <div class="footer">Trystero v0.25.x · Static HTML · 无需后端业务服务器</div>
+    </section>
+
+    <section id="callView" class="view">
+      <div class="roomHeader">
+        <div><div class="roomTitle" id="roomTitle">通话中</div><div class="roomCode" id="roomCode"></div></div>
+        <button id="shareBtn" class="secondary" style="height:38px;padding:0 12px">分享</button>
+      </div>
+
+      <div class="me">
+        <div id="myAvatar" class="avatar">我</div>
+        <div class="who"><strong id="myName">我</strong><span id="myId">正在连接…</span></div>
+        <div id="myMeter" class="meter"></div>
+      </div>
+
+      <div id="peerList" class="peerlist">
+        <div id="emptyState" class="empty">等待其他人加入房间…<br>保持此页面打开即可。</div>
+      </div>
+
+      <div class="callControls">
+        <button id="muteBtn" class="iconbtn">🎙️ 静音</button>
+        <button id="hangBtn" class="iconbtn hang">📵 挂断</button>
+      </div>
+      <div id="log" class="log hidden"></div>
+    </section>
+  </main>
+</div>
+<div id="toast" class="toast"></div>
+
+<script type="module">
+import { joinRoom, selfId } from 'https://esm.run/trystero@0.25.3'
+
+const APP_ID = 'blue-sky-p2p-call-2026'
+const CONFIG = {
+  appId: APP_ID,
+  // 可按需填写共享密码；保持空值时，Trystero 会从 appId + room 生成会话加密密钥。
+  // password: 'your-shared-room-password'
+}
+
+const $ = id => document.getElementById(id)
+const state = {
+  room: null,
+  roomId: '',
+  displayName: '访客',
+  localStream: null,
+  peers: new Map(),
+  muted: false,
+  joined: false,
+}
+
+function setStatus(text, mode='') {
+  $('statusText').textContent = text
+  $('statusDot').className = 'dot' + (mode ? ' ' + mode : '')
+}
+
+let toastTimer
+function toast(message) {
+  clearTimeout(toastTimer)
+  $('toast').textContent = message
+  $('toast').classList.add('show')
+  toastTimer = setTimeout(() => $('toast').classList.remove('show'), 2200)
+}
+
+function log(message) {
+  const line = `[${new Date().toLocaleTimeString()}] ${message}`
+  $('log').classList.remove('hidden')
+  $('log').textContent = (line + '\n' + $('log').textContent).slice(0, 4000)
+  console.log('[P2P]', message)
+}
+
+function randomRoom() {
+  const words = ['blue', 'sky', 'mist', 'star', 'moon', 'cloud', 'wind', 'river']
+  const word = words[Math.floor(Math.random() * words.length)]
+  return `${word}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+function shortId(id='') { return id ? id.slice(0, 6) : '------' }
+function avatarText(name, id) {
+  const s = (name || '').trim()
+  return s ? s.slice(0, 1).toUpperCase() : shortId(id).slice(0, 1).toUpperCase()
+}
+
+function peerLabel(peerId) {
+  const item = state.peers.get(peerId)
+  return item?.name || `设备 ${shortId(peerId)}`
+}
+
+function upsertPeerCard(peerId, statusText='已连接') {
+  $('emptyState')?.remove()
+  let row = document.getElementById(`peer-${peerId}`)
+  if (!row) {
+    row = document.createElement('div')
+    row.className = 'peer'
+    row.id = `peer-${peerId}`
+    row.innerHTML = `<div class="avatar"></div><div class="peerinfo"><div class="peername"></div><div class="peerstate"></div></div><div class="meter"></div>`
+    $('peerList').appendChild(row)
+  }
+  const item = state.peers.get(peerId) || {}
+  row.querySelector('.avatar').textContent = avatarText(item.name, peerId)
+  row.querySelector('.peername').textContent = peerLabel(peerId)
+  row.querySelector('.peerstate').textContent = statusText
+}
+
+function removePeerCard(peerId) {
+  document.getElementById(`peer-${peerId}`)?.remove()
+  if (!$('peerList').children.length) {
+    const empty = document.createElement('div')
+    empty.id = 'emptyState'
+    empty.className = 'empty'
+    empty.innerHTML = '等待其他人加入房间…<br>保持此页面打开即可。'
+    $('peerList').appendChild(empty)
+  }
+}
+
+async function unlockAudio() {
+  for (const item of state.peers.values()) {
+    if (item.audio) {
+      try { await item.audio.play() } catch (_) {}
+    }
+  }
+}
+
+function teardownAudio() {
+  for (const item of state.peers.values()) {
+    try { item.audio.pause(); item.audio.srcObject = null } catch (_) {}
+  }
+  state.peers.clear()
+}
+
+async function join() {
+  if (state.joined) return
+  if (!navigator.mediaDevices?.getUserMedia) {
+    toast('当前浏览器或环境不支持麦克风访问')
+    return
+  }
+
+  const roomId = $('roomInput').value.trim()
+  if (!roomId) {
+    toast('请输入房间号')
+    $('roomInput').focus()
+    return
+  }
+
+  state.roomId = roomId
+  state.displayName = $('nameInput').value.trim() || '访客'
+  localStorage.setItem('p2p-call-name', state.displayName)
+  localStorage.setItem('p2p-call-room', roomId)
+
+  setStatus('请求麦克风…')
+  $('joinBtn').disabled = true
+
+  try {
+    state.localStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        channelCount: 1,
+      },
+      video: false,
+    })
+
+    state.room = joinRoom(CONFIG, roomId)
+    state.joined = true
+
+    state.room.onPeerJoin = peerId => {
+      log(`发现对方：${shortId(peerId)}`)
+      state.peers.set(peerId, {name: `设备 ${shortId(peerId)}`})
+      upsertPeerCard(peerId, '正在建立音频连接…')
+      // 发送给已经存在的对端，以及处理晚加入者
+      state.room.addStream(state.localStream, {target: peerId})
+    }
+
+    state.room.onPeerLeave = peerId => {
+      log(`对方离开：${shortId(peerId)}`)
+      const item = state.peers.get(peerId)
+      try { if (item?.audio) { item.audio.pause(); item.audio.srcObject = null } } catch (_) {}
+      state.peers.delete(peerId)
+      removePeerCard(peerId)
+      broadcastPresence()
+    }
+
+    state.room.onPeerStream = (stream, peerId) => {
+      log(`收到对方音频：${shortId(peerId)}`)
+      let item = state.peers.get(peerId) || {name: `设备 ${shortId(peerId)}`}
+      let audio = item.audio
+      if (!audio) {
+        audio = new Audio()
+        audio.autoplay = true
+        audio.playsInline = true
+        audio.volume = 1
+        audio.setAttribute('aria-label', `来自 ${peerLabel(peerId)} 的音频`)
+        item.audio = audio
+        state.peers.set(peerId, item)
+      }
+      audio.srcObject = stream
+      upsertPeerCard(peerId, '通话已连接')
+      audio.play().catch(() => {
+        upsertPeerCard(peerId, '已连接，点一下页面开始播放')
+      })
+    }
+
+    // 用 Trystero action 做极轻量的昵称发现，不参与音频传输。
+    const presence = state.room.makeAction('presence-v1')
+    state.presence = presence
+    presence.onMessage = (data, {peerId}) => {
+      const old = state.peers.get(peerId) || {}
+      state.peers.set(peerId, {...old, name: data?.name || old.name || `设备 ${shortId(peerId)}`})
+      upsertPeerCard(peerId, old.audio ? '通话已连接' : '正在连接…')
+    }
+    state.room.onPeerJoin = ((original) => peerId => {
+      original?.(peerId)
+      presence.send({name: state.displayName}, {target: peerId})
+    })(state.room.onPeerJoin)
+
+    // 关键：向当前房间所有已连接 peers 发自己的昵称。
+    setTimeout(() => presence.send({name: state.displayName}), 300)
+
+    // 初始音频流广播；新加入者由 onPeerJoin 定向发送。
+    state.room.addStream(state.localStream)
+
+    $('joinView').classList.remove('active')
+    $('callView').classList.add('active')
+    $('roomTitle').textContent = `房间 · ${roomId}`
+    $('roomCode').textContent = `P2P 房间号：${roomId}`
+    $('myName').textContent = state.displayName
+    $('myId').textContent = `Peer ID：${selfId}`
+    $('myAvatar').textContent = avatarText(state.displayName, selfId)
+    setStatus('已入房间', 'ok')
+    toast('已进入房间，等待其他设备')
+    log(`进入房间 ${roomId}`)
+    await unlockAudio()
+  } catch (error) {
+    console.error(error)
+    state.joined = false
+    state.room = null
+    state.localStream?.getTracks().forEach(t => t.stop())
+    state.localStream = null
+    $('joinBtn').disabled = false
+    setStatus('连接失败', 'err')
+    const msg = error?.name === 'NotAllowedError' ? '麦克风权限被拒绝' : `无法加入：${error?.message || error}`
+    toast(msg)
+    log(msg)
+  } finally {
+    $('joinBtn').disabled = false
+  }
+}
+
+function broadcastPresence() {
+  try { state.presence?.send({name: state.displayName}) } catch (_) {}
+}
+
+async function hangup() {
+  if (!state.joined) return
+  try { state.room?.leave?.() } catch (_) {}
+  teardownAudio()
+  state.localStream?.getTracks().forEach(t => t.stop())
+  state.localStream = null
+  state.room = null
+  state.presence = null
+  state.joined = false
+  state.muted = false
+  $('muteBtn').textContent = '🎙️ 静音'
+  $('muteBtn').classList.remove('active')
+  $('peerList').innerHTML = '<div id="emptyState" class="empty">等待其他人加入房间…<br>保持此页面打开即可。</div>'
+  $('callView').classList.remove('active')
+  $('joinView').classList.add('active')
+  setStatus('未连接')
+  toast('已挂断')
+}
+
+function toggleMute() {
+  if (!state.localStream) return
+  state.muted = !state.muted
+  state.localStream.getAudioTracks().forEach(track => track.enabled = !state.muted)
+  $('muteBtn').textContent = state.muted ? '🔇 已静音' : '🎙️ 静音'
+  $('muteBtn').classList.toggle('active', state.muted)
+  toast(state.muted ? '麦克风已静音' : '麦克风已恢复')
+}
+
+async function shareRoom() {
+  const url = new URL(location.href)
+  url.searchParams.set('room', state.roomId)
+  if (navigator.share) {
+    try { await navigator.share({title:'P2P 通话', text:`加入我的 P2P 通话房间：${state.roomId}`, url:url.href}); return } catch (_) {}
+  }
+  await navigator.clipboard?.writeText(url.href)
+  toast('房间链接已复制')
+}
+
+$('randomBtn').onclick = () => { $('roomInput').value = randomRoom(); toast('已生成随机房间号') }
+$('copyBtn').onclick = async () => {
+  const room = $('roomInput').value.trim()
+  if (!room) { toast('先填写房间号'); return }
+  try { await navigator.clipboard.writeText(room); toast('房间号已复制') } catch (_) { toast('复制失败，请长按输入框') }
+}
+$('joinBtn').onclick = join
+$('hangBtn').onclick = hangup
+$('muteBtn').onclick = toggleMute
+$('shareBtn').onclick = shareRoom
+window.addEventListener('click', unlockAudio, {passive:true})
+window.addEventListener('pagehide', () => { try { state.room?.leave?.() } catch (_) {} })
+
+const params = new URLSearchParams(location.search)
+$('roomInput').value = params.get('room') || localStorage.getItem('p2p-call-room') || ''
+$('nameInput').value = localStorage.getItem('p2p-call-name') || ''
+if (!$('roomInput').value) $('roomInput').value = randomRoom()
+
+// 防止浏览器在移动端把页面手势识别成选中文本/拖拽。
+document.addEventListener('contextmenu', e => { if (e.target.matches('button,.avatar,.logo')) e.preventDefault() })
+</script>
+</body>
+</html>
